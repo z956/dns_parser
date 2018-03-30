@@ -43,10 +43,14 @@ static struct dns_header *dns_header_alloc(struct pkt_proc *pp)
 
 	return dh;
 }
+static int parse_domain_name(struct pkt_proc *pp, struct dns_quest *dq)
+{
+	//TODO
+	return -1;
+}
 static struct dns_quest *dns_query_alloc(const struct dns_header *hdr,
 					struct pkt_proc *pp)
 {
-	//TODO
 	int i;
 	struct dns_quest *dq = malloc(sizeof(struct dns_quest) * hdr->qd_count);
 	if (!dq) {
@@ -55,7 +59,23 @@ static struct dns_quest *dns_query_alloc(const struct dns_header *hdr,
 	}
 	for (i = 0; i < hdr->qd_count; i++) {
 		//parse name first
+		if (!parse_domain_name(pp, &dq[i])) {
+			ERR("parse_domain_name %d failed\n", i);
+			goto err;
+		}
+
+		if (pp->offset + sizeof(uint16_t) * 2 > len) {
+			ERR("Invalid pkt\n");
+			goto err;
+		}
+		dq[i].qtype = ntohs(*((uint16_t *)pp->pkt + pp->offset));
+		pp->offset += sizeof(uint16_t);
+
+		dq[i].qclass = ntohs(*((uint16_t *)pp->pkt + pp->offset));
+		pp->offset += sizeof(uint16_t);
 	}
+err:
+	free(dq);
 	return NULL;
 }
 static struct dns_rr *dns_reply_alloc(const struct dns_header *hdr,
