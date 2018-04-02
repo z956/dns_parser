@@ -296,9 +296,24 @@ err:
 }
 void dns_del(struct dns_pkt *dp)
 {
+	int i;
 	if (!dp)
 		return;
 	free(dp->quests);
+
+	if (dp->hdr && dp->answers) {
+		for (i = 0; i < dp->hdr->an_count; i++) {
+			switch (dp->answers[i].qtype) {
+			case DNS_TYPE_NULL:
+			case DNS_TYPE_TXT:
+				free(dp->answers[i].data);
+				break;
+			default:
+				break;
+			}
+		}
+	}
 	free(dp->answers);
+	free(dp->hdr);
 }
 
