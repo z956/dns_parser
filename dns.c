@@ -76,6 +76,9 @@ static int parse_domain_name(struct pkt_proc *pp, unsigned char *qname)
 			offset = offset * 16 + *p;
 			if (offset >= pp->len)
 				break;
+
+			if (offset >= (p - pp->pkt - 1))
+				break;
 			if (!in_ptr)
 				pp->offset += 1;
 			p = pp->pkt + offset;
