@@ -17,6 +17,9 @@
 static LIST_HEAD(query_head);
 static LIST_HEAD(reply_head);
 
+static LIST_HEAD(non_tunnel_head);
+static LIST_HEAD(tunnel_head);
+
 static void del_list(void)
 {
 	struct dns_pkt *dp;
@@ -28,6 +31,17 @@ static void del_list(void)
 
 	while (!list_empty(&reply_head)) {
 		dp = list_first_entry(&reply_head, struct dns_pkt, list);
+		list_del(&dp->list);
+		dns_del(dp);
+	}
+
+	while (!list_empty(&non_tunnel_head)) {
+		dp = list_first_entry(&non_tunnel_head, struct dns_pkt, list);
+		list_del(&dp->list);
+		dns_del(dp);
+	}
+	while (!list_empty(&tunnel_head)) {
+		dp = list_first_entry(&tunnel_head, struct dns_pkt, list);
 		list_del(&dp->list);
 		dns_del(dp);
 	}
@@ -102,7 +116,7 @@ void update_statistic(struct statistic *s, unsigned int v)
 }
 static void print_statistic(const char *tag, struct statistic *s, int n)
 {
-	DBG("\n%s:\n"
+	PRT("\n%s:\n"
 		"\tTotal: %u\n"
 		"\tAvg: %lf\n"
 		"\tMax: %u\n"
@@ -110,17 +124,54 @@ static void print_statistic(const char *tag, struct statistic *s, int n)
 		tag, s->total, ((double)s->total) / n,
 		s->max, s->min);
 }
-static void check_query_domain_name(void)
+static void check_tunnel(void)
 {
-	struct dns_pkt *dp;
+	struct dns_pkt *dp, *tmp;
+
 	struct statistic name_len, unique_char, longest_repeat;
 	init_statistic(&name_len);
 	init_statistic(&unique_char);
 	init_statistic(&longest_repeat);
 	unsigned int count = 0;
+	list_for_each_entry_safe(dp, tmp, &query_head, list) {
+		int i;
+		for (i = 0; i < dp->hdr->qd_count; i++) {
+			struct domain_name *name = &dp->quests[i].name;
+			unsigned int domain_len = name->len;
+			unsigned int unique_len = get_unique_char(name->name, name->len);
+			unsigned int longest_len = get_longest_repeat(name->name, name->len);
 
-	DBG("Start checking domain name\n");
-	list_for_each_entry(dp, &query_head, list) {
+			if (longest_len < 15 && domain_len < 70) {
+				list_del_init(&dp->list);
+				list_add(&dp->list, &non_tunnel_head);
+			}
+			else {
+				list_del_init(&dp->list);
+				list_add(&dp->list, &tunnel_head);
+			}
+
+			update_statistic(&name_len, domain_len);
+			update_statistic(&unique_char, unique_len);
+			update_statistic(&longest_repeat, longest_len);
+			count++;
+		}
+	}
+
+	PRT("Total packet: %u\n", count);
+	print_statistic("Domain name len", &name_len, count);
+	print_statistic("Unique char len", &unique_char, count);
+	print_statistic("Longest repeat len", &longest_repeat, count);
+}
+static void print_tunnel_pkt(struct list_head *head)
+{
+	struct dns_pkt *dp;
+	unsigned int count = 0;
+	struct statistic name_len, unique_char, longest_repeat;
+	init_statistic(&name_len);
+	init_statistic(&unique_char);
+	init_statistic(&longest_repeat);
+
+	list_for_each_entry(dp, head, list) {
 		int i;
 		for (i = 0; i < dp->hdr->qd_count; i++) {
 			struct domain_name *name = &dp->quests[i].name;
@@ -131,24 +182,39 @@ static void check_query_domain_name(void)
 			update_statistic(&name_len, domain_len);
 			update_statistic(&unique_char, unique_len);
 			update_statistic(&longest_repeat, longest_len);
+
+			PRT("id: 0x%x, type: %d, name: %s\n",
+			dp->hdr->id, dp->quests[i].qtype, dp->quests[i].name.name);
 			count++;
 		}
 	}
-
-	DBG("Total packet: %u\n", count);
-	print_statistic("Domain name len", &name_len, count);
-	print_statistic("Unique char len", &unique_char, count);
-	print_statistic("Longest repeat len", &longest_repeat, count);
+	if (count) {
+		PRT("Total packet: %u\n", count);
+		print_statistic("Domain name len", &name_len, count);
+		print_statistic("Unique char len", &unique_char, count);
+		print_statistic("Longest repeat len", &longest_repeat, count);
+	}
 }
 
 int main(int argc, char **argv)
 {
 	pcap_t *descr;
 	char err[PCAP_ERRBUF_SIZE];
+	int print_tunnel = 1, print_non_tunnel = 1;
 
-	if (argc != 2) {
+	if (argc < 2) {
 		ERR("Need a file to read\n");
 		return -1;
+	}
+	if (argc > 2) {
+		if (strcmp(argv[2], "-t") == 0) {
+			print_tunnel = 1;
+			print_non_tunnel = 0;
+		}
+		else if (strcmp(argv[2], "-n") == 0) {
+			print_tunnel = 0;
+			print_non_tunnel = 1;
+		}
 	}
 	descr = pcap_open_offline(argv[1], err);
 	if (!descr) {
@@ -161,7 +227,18 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	check_query_domain_name();
+	DBG("ready to check tunnel\n");
+	check_tunnel();
+	if (print_tunnel) {
+		PRT("*** print tunnel pkt start\n");
+		print_tunnel_pkt(&tunnel_head);
+		PRT("*** print tunnel pkt end\n");
+	}
+	if (print_non_tunnel) {
+		PRT("*** print non-tunnel pkt start\n");
+		print_tunnel_pkt(&non_tunnel_head);
+		PRT("*** print non-tunnel pkt end\n");
+	}
 
 	del_list();
 	DBG("parse pcap done\n");
