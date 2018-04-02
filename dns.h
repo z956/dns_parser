@@ -68,17 +68,23 @@ struct dns_quest {
 	uint16_t qclass;
 };
 
-struct dns_rr {
-	uint16_t type;
-	uint16_t class;
+struct dns_answer {
+	unsigned char qname[MAX_DOMAIN_LEN];
+	uint16_t qtype;
+	uint16_t qclass;
 	uint32_t ttl;
 	uint16_t rd_len;
-} __attribute__ ((packed));
+	union {
+		uint32_t addr[4]; //A and AAAA
+		unsigned char cname[MAX_DOMAIN_LEN];//CNAME, NS
+		unsigned char *data; //NULL, TXT
+	};
+};
 
 struct dns_pkt {
 	struct dns_header *hdr;
 	struct dns_quest *quests;
-	struct dns_rr *rrs;
+	struct dns_answer *answers;
 };
 
 struct dns_pkt *dns_alloc(const u_char *pkt, unsigned int len);
