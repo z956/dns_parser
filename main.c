@@ -6,11 +6,140 @@
 #include <netinet/udp.h>
 #include <arpa/inet.h>
 #include <stdint.h>
+#include <string.h>
+#include <limits.h>
 
+#define _DNS_PARSER_DBG_
 #include "dns.h"
 #include "common.h"
+#include "list.h"
+
+static LIST_HEAD(query_head);
+static LIST_HEAD(reply_head);
+
+static void del_list(void)
+{
+	struct dns_pkt *dp;
+	while (!list_empty(&query_head)) {
+		dp = list_first_entry(&query_head, struct dns_pkt, list);
+		list_del(&dp->list);
+		dns_del(dp);
+	}
+
+	while (!list_empty(&reply_head)) {
+		dp = list_first_entry(&reply_head, struct dns_pkt, list);
+		list_del(&dp->list);
+		dns_del(dp);
+	}
+}
 
 static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt);
+static unsigned int get_unique_char(const unsigned char *str, int len)
+{
+	unsigned char charset[256];
+	int i;
+	unsigned int r = 0;
+
+	memset(charset, 0, 256);
+	for (i = 0; i < len; i++) {
+		charset[str[i]]++;
+	}
+
+	for (i = 0; i < 256; i++) {
+		r += !!charset[i];
+	}
+	return r;
+}
+static unsigned int get_longest_repeat(const unsigned char *str, int len)
+{
+	int i;
+	unsigned int max_len = 0;
+	unsigned int non_vowel_len = 0;
+	for (i = 0; i < len; i++) {
+		switch (str[i]) {
+		case 'a':
+		case 'e':
+		case 'i':
+		case 'o':
+		case 'u':
+		case 'A':
+		case 'E':
+		case 'I':
+		case 'O':
+		case 'U':
+		case '.':
+		case '-':
+			if (non_vowel_len > max_len)
+				max_len = non_vowel_len;
+			non_vowel_len = 0;
+			break;
+		default:
+			non_vowel_len++;
+			break;
+		}
+	}
+	return max_len;
+}
+
+struct statistic {
+	unsigned int total;
+	unsigned int max;
+	unsigned int min;
+};
+void init_statistic(struct statistic *s)
+{
+	s->total = 0;
+	s->max = 0;
+	s->min = INT_MAX;
+}
+void update_statistic(struct statistic *s, unsigned int v)
+{
+	s->total += v;
+	if (v > s->max)
+		s->max = v;
+	if (v < s->min)
+		s->min = v;
+}
+static void print_statistic(const char *tag, struct statistic *s, int n)
+{
+	DBG("\n%s:\n"
+		"\tTotal: %u\n"
+		"\tAvg: %lf\n"
+		"\tMax: %u\n"
+		"\tMin: %u\n",
+		tag, s->total, ((double)s->total) / n,
+		s->max, s->min);
+}
+static void check_query_domain_name(void)
+{
+	struct dns_pkt *dp;
+	struct statistic name_len, unique_char, longest_repeat;
+	init_statistic(&name_len);
+	init_statistic(&unique_char);
+	init_statistic(&longest_repeat);
+	unsigned int count = 0;
+
+	DBG("Start checking domain name\n");
+	list_for_each_entry(dp, &query_head, list) {
+		int i;
+		for (i = 0; i < dp->hdr->qd_count; i++) {
+			struct domain_name *name = &dp->quests[i].name;
+			unsigned int domain_len = name->len;
+			unsigned int unique_len = get_unique_char(name->name, name->len);
+			unsigned int longest_len = get_longest_repeat(name->name, name->len);
+
+			update_statistic(&name_len, domain_len);
+			update_statistic(&unique_char, unique_len);
+			update_statistic(&longest_repeat, longest_len);
+			count++;
+		}
+	}
+
+	DBG("Total packet: %u\n", count);
+	print_statistic("Domain name len", &name_len, count);
+	print_statistic("Unique char len", &unique_char, count);
+	print_statistic("Longest repeat len", &longest_repeat, count);
+}
 
 int main(int argc, char **argv)
 {
@@ -32,6 +161,9 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	check_query_domain_name();
+
+	del_list();
 	DBG("parse pcap done\n");
 	return 0;
 }
@@ -87,6 +219,15 @@ static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pk
 		return;
 	}
 
-	dns_del(dp);
+	switch (dns_qr(dp->hdr)) {
+	case DNS_QR_QUERY:
+		list_add(&dp->list, &query_head);
+		break;
+	case DNS_QR_REPLY:
+		list_add(&dp->list, &reply_head);
+		break;
+	default:
+		break;
+	}
 }
 
