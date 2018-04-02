@@ -121,30 +121,28 @@ static int parse_quest_section(struct pkt_proc *pp,
 	}
 	return 0;
 }
-static struct dns_quest *dns_query_alloc(const struct dns_header *hdr,
-					struct pkt_proc *pp)
+static int dns_query(struct dns_pkt *dp, struct pkt_proc *pp)
 {
+	const struct dns_header *hdr = dp->hdr;
 	struct dns_quest *dq = calloc(1, sizeof(struct dns_quest) * hdr->qd_count);
 	if (!dq) {
 		ERR("Cannot allocate for dns quest\n");
-		return NULL;
+		return -1;
 	}
 
 	if (parse_quest_section(pp, hdr->qd_count, dq)) {
 		ERR("parse_quest_section failed\n");
-		goto err;
+		free(dq);
+		return -1;
 	}
 
-	return dq;
-err:
-	free(dq);
-	return NULL;
+	dp->quests = dq;
+	return 0;
 }
-static struct dns_rr *dns_reply_alloc(const struct dns_header *hdr,
-					struct pkt_proc *pp)
+static int dns_reply(struct dns_pkt *dp, struct pkt_proc *pp)
 {
 	//TODO
-	return NULL;
+	return -1;
 }
 struct dns_pkt *dns_alloc(const u_char *pkt, unsigned int len)
 {
@@ -176,15 +174,13 @@ struct dns_pkt *dns_alloc(const u_char *pkt, unsigned int len)
 	qr_code = dns_qr(dp->hdr);
 	switch (qr_code) {
 	case DNS_QR_QUERY:
-		dp->quests = dns_query_alloc(dp->hdr, &pp);
-		if (!dp->quests) {
+		if (dns_query(dp, &pp)) {
 			ERR("dns_query_alloc failed\n");
 			goto err;
 		}
 		break;
 	case DNS_QR_REPLY:
-		dp->rrs = dns_reply_alloc(dp->hdr, &pp);
-		if (!dp->rrs) {
+		if (dns_reply(dp, &pp)) {
 			ERR("dns_reply_alloc failed\n");
 			goto err;
 		}
