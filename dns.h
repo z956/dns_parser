@@ -62,21 +62,25 @@ struct dns_header {
 #define DNS_TYPE_TXT	(0x0010)
 #define DNS_TYPE_AAAA	(0x001C)
 
+struct domain_name {
+	int len;
+	unsigned char name[MAX_DOMAIN_LEN];
+};
 struct dns_quest {
-	unsigned char qname[MAX_DOMAIN_LEN];
+	struct domain_name name;
 	uint16_t qtype;
 	uint16_t qclass;
 };
 
 struct dns_answer {
-	unsigned char qname[MAX_DOMAIN_LEN];
+	struct domain_name name;
 	uint16_t qtype;
 	uint16_t qclass;
 	uint32_t ttl;
 	uint16_t rd_len;
 	union {
 		uint32_t addr[4]; //A and AAAA
-		unsigned char cname[MAX_DOMAIN_LEN];//CNAME, NS
+		struct domain_name cname; //CNAME, NS
 		unsigned char *data; //NULL, TXT
 	};
 };

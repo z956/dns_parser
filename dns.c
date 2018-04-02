@@ -54,7 +54,7 @@ static struct dns_header *dns_header_alloc(struct pkt_proc *pp)
 
 	return dh;
 }
-static int parse_domain_name(struct pkt_proc *pp, unsigned char *qname)
+static int parse_domain_name(struct pkt_proc *pp, struct domain_name *name)
 {
 	const u_char *p = pp->pkt + pp->offset;
 	const u_char *tail = pp->pkt + pp->len;
@@ -86,22 +86,23 @@ static int parse_domain_name(struct pkt_proc *pp, unsigned char *qname)
 			in_ptr = 1;
 		}
 		else if (label_len) {
-			qname[total_len++] = *p;
+			name->name[total_len++] = *p;
 			p++;
 			label_len--;
 		}
 		else {
-			qname[total_len++] = '.';
+			name->name[total_len++] = '.';
 			label_len = *p;
 			p++;
 		}
 	}
 	if (*p || p == tail)
 		return -1;
-	qname[total_len] = 0;
+	name->name[total_len] = 0;
+	name->len = total_len;
 	if (!in_ptr)
 		pp->offset++;
-	DBG("parsed domain name: %s, offset: %d\n", qname, pp->offset);
+	DBG("parsed domain name %d, %s, offset: %d\n", name->len, name->name, pp->offset);
 	return total_len;
 }
 static int parse_quest_section(struct pkt_proc *pp,
@@ -109,7 +110,7 @@ static int parse_quest_section(struct pkt_proc *pp,
 {
 	int i;
 	for (i = 0; i < qd_count; i++) {
-		if (parse_domain_name(pp, dq[i].qname) < 0) {
+		if (parse_domain_name(pp, &dq[i].name) < 0) {
 			ERR("parse_domain_name %d failed\n", i);
 			return -1;
 		}
@@ -150,7 +151,7 @@ static int parse_answer_section(struct pkt_proc *pp,
 {
 	int i, j;
 	for (i = 0; i < ans_count; i++) {
-		if (parse_domain_name(pp, ans[i].qname) < 0) {
+		if (parse_domain_name(pp, &ans[i].name) < 0) {
 			ERR("parse_domain_name %d failed\n", i);
 			return -1;
 		}
@@ -186,7 +187,7 @@ static int parse_answer_section(struct pkt_proc *pp,
 //		case DNS_TYPE_NS:
 //			break;
 		case DNS_TYPE_CNAME:
-			if (parse_domain_name(pp, ans[i].cname) < 0) {
+			if (parse_domain_name(pp, &ans[i].cname) < 0) {
 				ERR("parse_domain_name cname failed\n");
 				return -1;
 			}
