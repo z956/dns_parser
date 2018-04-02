@@ -8,9 +8,8 @@
 #include <stdint.h>
 
 #include "dns.h"
+#include "common.h"
 
-//static int pkt_count;
-//static int dns_count;
 static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt);
 
 int main(int argc, char **argv)
@@ -19,21 +18,21 @@ int main(int argc, char **argv)
 	char err[PCAP_ERRBUF_SIZE];
 
 	if (argc != 2) {
-		printf("Need a file to read\n");
+		ERR("Need a file to read\n");
 		return -1;
 	}
 	descr = pcap_open_offline(argv[1], err);
 	if (!descr) {
-		printf("open pcap file %s failed: %s\n", argv[1], err);
+		ERR("open pcap file %s failed: %s\n", argv[1], err);
 		return -1;
 	}
 
 	if (pcap_loop(descr, 0, cb_pkt, NULL) < 0) {
-		printf("packet_loop failed: %s\n", err);
+		ERR("packet_loop failed: %s\n", err);
 		return -1;
 	}
 
-	printf("parse pcap done\n");
+	DBG("parse pcap done\n");
 	return 0;
 }
 
@@ -77,7 +76,7 @@ static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pk
 	dns_len = hdr->caplen - offset;
 	dp = dns_alloc(pkt + offset, dns_len);
 	if (!dp) {
-		printf("parse_dns failed\n");
+		ERR("parse_dns failed\n");
 		return;
 	}
 
