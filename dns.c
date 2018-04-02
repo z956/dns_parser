@@ -12,11 +12,6 @@ struct pkt_proc {
 	unsigned int len;
 };
 
-static inline int dns_qr(const struct dns_header *hdr)
-{
-	return hdr? DNS_FLAG_QR(hdr->flag_code) : -1;
-}
-
 static struct dns_header *dns_header_alloc(struct pkt_proc *pp)
 {
 	struct dns_header *h, *dh;
@@ -258,6 +253,8 @@ struct dns_pkt *dns_alloc(const u_char *pkt, unsigned int len)
 		ERR("Cannot alloc for dns packet\n");
 		goto err;
 	}
+
+	INIT_LIST_HEAD(&dp->list);
 
 	pp.pkt = pkt;
 	pp.offset = 0;

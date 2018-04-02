@@ -4,6 +4,8 @@
 #include <sys/types.h>
 #include <stdint.h>
 
+#include "list.h"
+
 struct dns_header {
 	/* query id */
 	uint16_t id;
@@ -86,6 +88,7 @@ struct dns_answer {
 };
 
 struct dns_pkt {
+	struct list_head list;
 	struct dns_header *hdr;
 	struct dns_quest *quests;
 	struct dns_answer *answers;
@@ -93,5 +96,10 @@ struct dns_pkt {
 
 struct dns_pkt *dns_alloc(const u_char *pkt, unsigned int len);
 void dns_del(struct dns_pkt *dp);
+
+static inline int dns_qr(const struct dns_header *hdr)
+{
+	return hdr? DNS_FLAG_QR(hdr->flag_code) : -1;
+}
 
 #endif
