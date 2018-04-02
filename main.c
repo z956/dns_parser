@@ -38,32 +38,39 @@ int main(int argc, char **argv)
 
 static int is_dns(const u_char *pkt)
 {
-#define L4_OFFSET (sizeof(struct ether_header) + sizeof(struct ip))
 	const struct ether_header *eh;
 	const struct ip *iph;
+	int l2_offset, l4_offset;
 	u_int src, dst;
 
 	eh = (struct ether_header *)pkt;
-	if (ntohs(eh->ether_type) != ETHERTYPE_IP)
-		return 0;
+	if (ntohs(eh->ether_type) == ETHERTYPE_IP)
+		l2_offset = sizeof(struct ether_header);
+	else {
+		int v = ntohs(*(uint16_t *)(pkt + 14));
+		l2_offset = 16;
+		if (v != 0x0800)
+			return 0;
+	}
+	l4_offset = sizeof(struct ip) + l2_offset;
 
-	iph = (struct ip *)(pkt + sizeof(struct ether_header));
+	iph = (struct ip *)(pkt + l2_offset);
 	if (iph->ip_p == IPPROTO_TCP) {
-		const struct tcphdr *tcph = (const struct tcphdr *)(pkt + L4_OFFSET);
+		const struct tcphdr *tcph = (const struct tcphdr *)(pkt + l4_offset);
 		src = ntohs(tcph->source);
 		dst = ntohs(tcph->dest);
 		if (src == 53 || dst == 53)
-			return L4_OFFSET + sizeof(struct tcphdr);
+			return l4_offset + sizeof(struct tcphdr);
 	}
 	else if (iph->ip_p == IPPROTO_UDP) {
-		const struct udphdr *udph = (const struct udphdr *)(pkt + L4_OFFSET);
+		const struct udphdr *udph = (const struct udphdr *)(pkt + l4_offset);
 		src = ntohs(udph->source);
 		dst = ntohs(udph->dest);
 		if (src == 53 || dst == 53)
-			return L4_OFFSET + sizeof(struct udphdr);
+			return l4_offset + sizeof(struct udphdr);
 	}
+
 	return 0;
-#undef L4_OFFSET
 }
 
 static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt)
