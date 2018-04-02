@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "common.h"
 
@@ -13,7 +14,7 @@ struct pkt_proc {
 
 static inline int dns_qr(const struct dns_header *hdr)
 {
-	hdr? DNS_FLAG_QR(hdr->flag_code) : -1;
+	return hdr? DNS_FLAG_QR(hdr->flag_code) : -1;
 }
 
 static struct dns_header *dns_header_alloc(struct pkt_proc *pp)
@@ -25,7 +26,7 @@ static struct dns_header *dns_header_alloc(struct pkt_proc *pp)
 		return NULL;
 	}
 
-	dh = malloc(sizeof(struct dns_header));
+	dh = calloc(1, sizeof(struct dns_header));
 	if (!dh) {
 		ERR("Cannot alloc for dns header\n");
 		return NULL;
@@ -52,7 +53,7 @@ static struct dns_quest *dns_query_alloc(const struct dns_header *hdr,
 					struct pkt_proc *pp)
 {
 	int i;
-	struct dns_quest *dq = malloc(sizeof(struct dns_quest) * hdr->qd_count);
+	struct dns_quest *dq = calloc(1, sizeof(struct dns_quest) * hdr->qd_count);
 	if (!dq) {
 		ERR("Cannot allocate for dns quest\n");
 		return NULL;
@@ -64,7 +65,7 @@ static struct dns_quest *dns_query_alloc(const struct dns_header *hdr,
 			goto err;
 		}
 
-		if (pp->offset + sizeof(uint16_t) * 2 > len) {
+		if (pp->offset + sizeof(uint16_t) * 2 > pp->len) {
 			ERR("Invalid pkt\n");
 			goto err;
 		}
@@ -74,6 +75,8 @@ static struct dns_quest *dns_query_alloc(const struct dns_header *hdr,
 		dq[i].qclass = ntohs(*((uint16_t *)pp->pkt + pp->offset));
 		pp->offset += sizeof(uint16_t);
 	}
+
+	return dq;
 err:
 	free(dq);
 	return NULL;
@@ -94,7 +97,7 @@ struct dns_pkt *dns_alloc(const u_char *pkt, unsigned int len)
 		return NULL;
 	}
 
-	struct dns_pkt *dp = malloc(sizeof(struct dns_pkt));
+	struct dns_pkt *dp = calloc(1, sizeof(struct dns_pkt));
 	if (!dp) {
 		ERR("Cannot alloc for dns packet\n");
 		goto err;
@@ -144,9 +147,7 @@ void dns_del(struct dns_pkt *dp)
 {
 	if (!dp)
 		return;
-	if (dp->quests)
-		free(dp->quests);
-	if (dp->rrs)
-		free(dp->rrs);
+	free(dp->quests);
+	free(dp->rrs);
 }
 
