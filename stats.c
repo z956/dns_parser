@@ -1,10 +1,10 @@
-#include "statistics.h"
+#include "stats.h"
 
 #include <limits.h>
 
 #include "common.h"
 
-void init_statistics(const char *tag, struct statistics *s)
+void init_stats(const char *tag, struct stats *s)
 {
 	s->tag = tag;
 	s->total = 0;
@@ -12,7 +12,7 @@ void init_statistics(const char *tag, struct statistics *s)
 	s->min = INT_MAX;
 	s->count = 0;
 }
-void update_statistics(struct statistics *s, unsigned int v)
+void update_stats(struct stats *s, unsigned int v)
 {
 	s->total += v;
 	if (v > s->max)
@@ -21,7 +21,7 @@ void update_statistics(struct statistics *s, unsigned int v)
 		s->min = v;
 	s->count++;
 }
-void print_statistics(struct statistics *s)
+void print_stats(struct stats *s)
 {
 	PRT("\n%s:\n"
 		"\tTotal: %u\n"

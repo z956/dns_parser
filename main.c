@@ -11,7 +11,7 @@
 #define _DNS_PARSER_DBG_
 #include "dns.h"
 #include "common.h"
-#include "statistics.h"
+#include "stats.h"
 #include "policy.h"
 #include "list.h"
 
@@ -36,12 +36,12 @@ static void del_list(void)
 
 static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt);
 
-static void apply_policy(struct policy *p, int count, void *data, struct statistics *sts)
+static void apply_policy(struct policy *p, int count, void *data, struct stats *sts)
 {
 	int i;
 	for (i = 0; i < count; i++) {
 		unsigned int r = (p[i].handle)(data);
-		update_statistics(&sts[i], r);
+		update_stats(&sts[i], r);
 	}
 }
 static void check_query(void)
@@ -51,31 +51,31 @@ static void check_query(void)
 	struct policy *req_policy = get_policy_req();
 	struct policy *quest_policy = get_policy_quest();
 
-	struct statistics req_statistics[POLICY_REQ_MAX];
-	struct statistics quest_statistics[POLICY_QUEST_MAX];
+	struct stats req_stats[POLICY_REQ_MAX];
+	struct stats quest_stats[POLICY_QUEST_MAX];
 
 	for (i = 0; i < POLICY_REQ_MAX; i++)
-		init_statistics(req_policy[i].name, &req_statistics[i]);
+		init_stats(req_policy[i].name, &req_stats[i]);
 	for (i = 0; i < POLICY_QUEST_MAX; i++)
-		init_statistics(quest_policy[i].name, &quest_statistics[i]);
+		init_stats(quest_policy[i].name, &quest_stats[i]);
 	unsigned int qd_count = 0, pkt_count = 0;
 	list_for_each_entry_safe (dp, tmp, &query_head, list) {
 		for (i = 0; i < dp->hdr->qd_count; i++) {
 			apply_policy(quest_policy, POLICY_QUEST_MAX,
-					&dp->quests[i], quest_statistics);
+					&dp->quests[i], quest_stats);
 		}
 		qd_count += dp->hdr->qd_count;
 
-		apply_policy(req_policy, POLICY_REQ_MAX, dp, req_statistics);
+		apply_policy(req_policy, POLICY_REQ_MAX, dp, req_stats);
 		pkt_count++;
 	}
 
 	PRT("Total query packet: %u\n", pkt_count);
 	PRT("Total question: %u\n", qd_count);
 	for (i = 0; i < POLICY_REQ_MAX; i++)
-		print_statistics(&req_statistics[i]);
+		print_stats(&req_stats[i]);
 	for (i = 0; i < POLICY_QUEST_MAX; i++)
-		print_statistics(&quest_statistics[i]);
+		print_stats(&quest_stats[i]);
 }
 
 int main(int argc, char **argv)

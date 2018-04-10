@@ -1,2 +1,2 @@
 all:
-	gcc -o dns dns.c main.c statistics.c policy.c -lpcap
+	gcc -o dns dns.c main.c stats.c policy.c -lpcap
