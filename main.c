@@ -7,11 +7,11 @@
 #include <arpa/inet.h>
 #include <stdint.h>
 #include <string.h>
-#include <limits.h>
 
 #define _DNS_PARSER_DBG_
 #include "dns.h"
 #include "common.h"
+#include "statistics.h"
 #include "list.h"
 
 static LIST_HEAD(query_head);
@@ -95,48 +95,19 @@ static unsigned int get_longest_repeat(const unsigned char *str, int len)
 	return max_len;
 }
 
-struct statistic {
-	unsigned int total;
-	unsigned int max;
-	unsigned int min;
-};
-void init_statistic(struct statistic *s)
-{
-	s->total = 0;
-	s->max = 0;
-	s->min = INT_MAX;
-}
-void update_statistic(struct statistic *s, unsigned int v)
-{
-	s->total += v;
-	if (v > s->max)
-		s->max = v;
-	if (v < s->min)
-		s->min = v;
-}
-static void print_statistic(const char *tag, struct statistic *s, int n)
-{
-	PRT("\n%s:\n"
-		"\tTotal: %u\n"
-		"\tAvg: %lf\n"
-		"\tMax: %u\n"
-		"\tMin: %u\n",
-		tag, s->total, ((double)s->total) / n,
-		s->max, s->min);
-}
 static void check_query(void)
 {
 	struct dns_pkt *dp, *tmp;
 
-	struct statistic query_name_len,
+	struct statistics query_name_len,
 			 query_unique_char,
 			 query_longest_repeat,
 			 query_len;
 
-	init_statistic(&query_len);
-	init_statistic(&query_name_len);
-	init_statistic(&query_unique_char);
-	init_statistic(&query_longest_repeat);
+	init_statistics(&query_len);
+	init_statistics(&query_name_len);
+	init_statistics(&query_unique_char);
+	init_statistics(&query_longest_repeat);
 	unsigned int qd_count = 0, pkt_count = 0;
 	list_for_each_entry_safe (dp, tmp, &query_head, list) {
 		int i;
@@ -155,31 +126,31 @@ static void check_query(void)
 				list_add(&dp->list, &tunnel_head);
 			}
 
-			update_statistic(&query_name_len, domain_len);
-			update_statistic(&query_unique_char, unique_len);
-			update_statistic(&query_longest_repeat, longest_len);
+			update_statistics(&query_name_len, domain_len);
+			update_statistics(&query_unique_char, unique_len);
+			update_statistics(&query_longest_repeat, longest_len);
 			qd_count++;
 		}
 
-		update_statistic(&query_len, dp->len);
+		update_statistics(&query_len, dp->len);
 		pkt_count++;
 	}
 
 	PRT("Total query packet: %u\n", pkt_count);
 	PRT("Total question: %u\n", qd_count);
-	print_statistic("Query packet len", &query_len, pkt_count);
-	print_statistic("Query domain name len", &query_name_len, qd_count);
-	print_statistic("Query unique char len", &query_unique_char, qd_count);
-	print_statistic("Query longest repeat len", &query_longest_repeat, qd_count);
+	print_statistics("Query packet len", &query_len, pkt_count);
+	print_statistics("Query domain name len", &query_name_len, qd_count);
+	print_statistics("Query unique char len", &query_unique_char, qd_count);
+	print_statistics("Query longest repeat len", &query_longest_repeat, qd_count);
 }
 static void print_tunnel_pkt(struct list_head *head)
 {
 	struct dns_pkt *dp;
 	unsigned int count = 0;
-	struct statistic name_len, unique_char, longest_repeat;
-	init_statistic(&name_len);
-	init_statistic(&unique_char);
-	init_statistic(&longest_repeat);
+	struct statistics name_len, unique_char, longest_repeat;
+	init_statistics(&name_len);
+	init_statistics(&unique_char);
+	init_statistics(&longest_repeat);
 
 	list_for_each_entry(dp, head, list) {
 		int i;
@@ -189,9 +160,9 @@ static void print_tunnel_pkt(struct list_head *head)
 			unsigned int unique_len = get_unique_char(name->name, name->len);
 			unsigned int longest_len = get_longest_repeat(name->name, name->len);
 
-			update_statistic(&name_len, domain_len);
-			update_statistic(&unique_char, unique_len);
-			update_statistic(&longest_repeat, longest_len);
+			update_statistics(&name_len, domain_len);
+			update_statistics(&unique_char, unique_len);
+			update_statistics(&longest_repeat, longest_len);
 
 			PRT("id: 0x%04x, type: %d, name: %s\n",
 			dp->hdr->id, dp->quests[i].qtype, dp->quests[i].name.name);
@@ -200,9 +171,9 @@ static void print_tunnel_pkt(struct list_head *head)
 	}
 	if (count) {
 		PRT("Total packet: %u\n", count);
-		print_statistic("Domain name len", &name_len, count);
-		print_statistic("Unique char len", &unique_char, count);
-		print_statistic("Longest repeat len", &longest_repeat, count);
+		print_statistics("Domain name len", &name_len, count);
+		print_statistics("Unique char len", &unique_char, count);
+		print_statistics("Longest repeat len", &longest_repeat, count);
 	}
 }
 
