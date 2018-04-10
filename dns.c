@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 #include "common.h"
 
@@ -135,8 +136,7 @@ static int parse_domain_name(struct pkt_proc *pp, struct domain_name *name)
 static int parse_quest_section(struct pkt_proc *pp,
 				int qd_count, struct dns_quest *dq)
 {
-	int i;
-	for (i = 0; i < qd_count; i++) {
+	for (int i = 0; i < qd_count; i++) {
 		if (parse_domain_name(pp, &dq[i].name) < 0) {
 			ERR("parse_domain_name %d failed\n", i);
 			return -1;
@@ -176,8 +176,7 @@ static int dns_query(struct dns_pkt *dp, struct pkt_proc *pp)
 static int parse_answer_section(struct pkt_proc *pp,
 				int ans_count, struct dns_answer *ans)
 {
-	int i, j;
-	for (i = 0; i < ans_count; i++) {
+	for (int i = 0; i < ans_count; i++) {
 		if (parse_domain_name(pp, &ans[i].name) < 0) {
 			ERR("parse_domain_name %d failed\n", i);
 			return -1;
@@ -234,7 +233,7 @@ static int parse_answer_section(struct pkt_proc *pp,
 			pp->offset += ans[i].rd_len;
 			break;
 		case DNS_TYPE_AAAA:
-			for (j = 0; j < 4; j++) {
+			for (int j = 0; j < 4; j++) {
 				ans[i].addr[j] = ntohl(*(uint32_t *)(pp->pkt + pp->offset));
 				pp->offset += sizeof(uint32_t);
 			}
@@ -327,13 +326,12 @@ err:
 }
 void dns_del(struct dns_pkt *dp)
 {
-	int i;
 	if (!dp)
 		return;
 	free(dp->quests);
 
 	if (dp->hdr && dp->answers) {
-		for (i = 0; i < dp->hdr->an_count; i++) {
+		for (int i = 0; i < dp->hdr->an_count; i++) {
 			switch (dp->answers[i].qtype) {
 			case DNS_TYPE_NULL:
 			case DNS_TYPE_TXT:

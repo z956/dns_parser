@@ -38,8 +38,7 @@ static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pk
 
 static void apply_policy(struct policy *p, int count, void *data, struct stats *sts)
 {
-	int i;
-	for (i = 0; i < count; i++) {
+	for (int i = 0; i < count; i++) {
 		unsigned int r = (p[i].handle)(data);
 		update_stats(&sts[i], r);
 	}
@@ -47,20 +46,19 @@ static void apply_policy(struct policy *p, int count, void *data, struct stats *
 static void check_query(void)
 {
 	struct dns_pkt *dp, *tmp;
-	int i;
 	struct policy *req_policy = get_policy_req();
 	struct policy *quest_policy = get_policy_quest();
 
 	struct stats req_stats[POLICY_REQ_MAX];
 	struct stats quest_stats[POLICY_QUEST_MAX];
 
-	for (i = 0; i < POLICY_REQ_MAX; i++)
+	for (int i = 0; i < POLICY_REQ_MAX; i++)
 		init_stats(req_policy[i].name, &req_stats[i]);
-	for (i = 0; i < POLICY_QUEST_MAX; i++)
+	for (int i = 0; i < POLICY_QUEST_MAX; i++)
 		init_stats(quest_policy[i].name, &quest_stats[i]);
 	unsigned int qd_count = 0, pkt_count = 0;
 	list_for_each_entry_safe (dp, tmp, &query_head, list) {
-		for (i = 0; i < dp->hdr->qd_count; i++) {
+		for (int i = 0; i < dp->hdr->qd_count; i++) {
 			apply_policy(quest_policy, POLICY_QUEST_MAX,
 					&dp->quests[i], quest_stats);
 		}
@@ -72,9 +70,9 @@ static void check_query(void)
 
 	PRT("Total query packet: %u\n", pkt_count);
 	PRT("Total question: %u\n", qd_count);
-	for (i = 0; i < POLICY_REQ_MAX; i++)
+	for (int i = 0; i < POLICY_REQ_MAX; i++)
 		print_stats(&req_stats[i]);
-	for (i = 0; i < POLICY_QUEST_MAX; i++)
+	for (int i = 0; i < POLICY_QUEST_MAX; i++)
 		print_stats(&quest_stats[i]);
 }
 

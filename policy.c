@@ -55,16 +55,15 @@ unsigned int policy_quest_unique_char(void *data)
 
 	if (quest) {
 		unsigned char charset[256];
-		int i;
 		unsigned int r = 0;
 		int len = quest->name.len;
 		const unsigned char *name = quest->name.name;
 
 		memset(charset, 0, 256);
-		for (i = 0; i < len; i++)
+		for (int i = 0; i < len; i++)
 			charset[name[i]]++;
 
-		for (i = 0; i < 256; i++)
+		for (int i = 0; i < 256; i++)
 			r += !!charset[i];
 		return r;
 	}
@@ -79,10 +78,9 @@ unsigned int policy_quest_longest_repeat(void *data)
 		int len = quest->name.len;
 		const unsigned char *name = quest->name.name;
 
-		int i;
 		unsigned int max_len = 0;
 		unsigned int non_vowel_len = 0;
-		for (i = 0; i < len; i++) {
+		for (int i = 0; i < len; i++) {
 			switch (name[i]) {
 			case 'a':
 			case 'e':
