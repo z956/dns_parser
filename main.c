@@ -22,6 +22,7 @@ static LIST_HEAD(rep_head);
 
 static int is_single_file;
 static char *file_name;
+static int file_pkt_count;
 
 static int parse_opt(int argc, char **argv);
 static int parse_pkt(const char *pcap);
@@ -105,6 +106,7 @@ int parse_pkt(const char *pcap)
 	}
 
 	name = strdup(pcap);
+	file_pkt_count = 1;
 	if (pcap_loop(descr, 0, cb_pkt, name) < 0) {
 		ERR("packet_loop failed on file %s: %s\n", name, err);
 		r = -1;
@@ -154,6 +156,9 @@ void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt)
 	struct dns_pkt *dp;
 	int offset;
 	unsigned int dns_len;
+
+	DBG("pkt count: %d\n", file_pkt_count);
+	file_pkt_count++;
 	if (!(offset = is_dns(pkt)))
 		return;
 	dns_len = hdr->caplen - offset;

@@ -5,6 +5,7 @@
 #include <string.h>
 #include <arpa/inet.h>
 
+//#define _DNS_PARSER_DBG_
 #include "common.h"
 
 struct pkt_proc {
@@ -90,45 +91,57 @@ static int parse_domain_name(struct pkt_proc *pp, struct domain_name *name)
 	int label_len = 0;
 	int in_ptr = 0;
 
-	while (p < tail && *p && total_len < MAX_DOMAIN_LEN) {
+	DBG("offset: %d, len: %u\n", pp->offset, pp->len);
+	while (p < tail && total_len < MAX_DOMAIN_LEN) {
 		if (!in_ptr)
 			pp->offset++;
-		if (*p == 0xc0) {
+
+		if (label_len) {
+			name->name[total_len++] = *p;
+			p++;
+			label_len--;
+		}
+		else if (*p == 0xc0) {
 			//ptr
 			const u_char *cur = p;
 			int offset = (*p) & 0x3F;
 			p++;
-			if (p >= tail || !*p)
+			if (p >= tail || !*p) {
+				ERR("p >= tail: %d, *p: %d\n", p >= tail, *p);
 				break;
+			}
 			offset = offset * 16 + *p;
-			if (offset >= pp->len)
+			if (offset >= pp->len) {
+				ERR("offset(%d) >= pp->len(%u)\n", offset, pp->len);
 				break;
+			}
 
-			if (offset >= (p - pp->pkt - 1))
+			if (offset >= (p - pp->pkt - 1)) {
+				ERR("offset(%d) >= p - pp->pkt - 1(%ld)\n", offset, p - pp->pkt - 1);
 				break;
+			}
 			if (!in_ptr)
 				pp->offset += 1;
 			p = pp->pkt + offset;
 			label_len = 0;
 			in_ptr = 1;
 		}
-		else if (label_len) {
-			name->name[total_len++] = *p;
-			p++;
-			label_len--;
-		}
 		else {
+			if (*p == 0)
+				break;
 			name->name[total_len++] = *p;
 			label_len = *p;
 			p++;
 		}
 	}
-	if (*p || p == tail)
+	if (*p || p == tail) {
+		ERR("*p: 0x%02x, p == tail? %d\n", *p, p == tail);
 		return -1;
+	}
 	name->name[total_len] = 0;
 	name->len = total_len;
-	if (!in_ptr)
-		pp->offset++;
+
+	DBG("offset: %d, len: %d, name: %s\n", pp->offset, name->len, name->name);
 	return total_len;
 }
 static int parse_quest_section(struct pkt_proc *pp,
@@ -157,6 +170,7 @@ static int dns_query(struct dns_pkt *dp, struct pkt_proc *pp)
 {
 	const struct dns_header *hdr = dp->hdr;
 
+	DBG("start!\n");
 	if (hdr->qd_count == 0) {
 		ERR("request(0x%04x) does not have question section\n", hdr->id);
 		return -1;
@@ -169,7 +183,7 @@ static int dns_query(struct dns_pkt *dp, struct pkt_proc *pp)
 	}
 
 	if (parse_quest_section(pp, hdr->qd_count, dq)) {
-		ERR("parse_quest_section failed\n");
+		ERR("parse_quest_section(0x%04x) failed\n", hdr->id);
 		free(dq);
 		return -1;
 	}
@@ -266,6 +280,7 @@ static int dns_reply(struct dns_pkt *dp, struct pkt_proc *pp)
 	struct dns_header *hdr;
 	struct dns_answer *ans;
 
+	DBG("start!\n");
 	if (dns_query(dp, pp)) {
 		ERR("dns_query failed\n");
 		return -1;
@@ -278,7 +293,7 @@ static int dns_reply(struct dns_pkt *dp, struct pkt_proc *pp)
 		return -1;
 	}
 	if (parse_answer_section(pp, hdr->an_count, ans)) {
-		ERR("parse_answer_section failed\n");
+		ERR("parse_answer_section(0x%04x) failed\n", hdr->id);
 		free(ans);
 		return -1;
 	}
