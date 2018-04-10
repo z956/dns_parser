@@ -7,6 +7,8 @@
 #include <arpa/inet.h>
 #include <stdint.h>
 #include <string.h>
+#include <unistd.h>
+#include <getopt.h>
 
 #define _DNS_PARSER_DBG_
 #include "dns.h"
@@ -17,42 +19,46 @@
 static LIST_HEAD(query_head);
 static LIST_HEAD(reply_head);
 
-static void del_list(void)
-{
-	struct dns_pkt *dp;
-	while (!list_empty(&query_head)) {
-		dp = list_first_entry(&query_head, struct dns_pkt, list);
-		list_del(&dp->list);
-		dns_del(dp);
-	}
+static int is_single_file;
+static char *file_name;
 
-	while (!list_empty(&reply_head)) {
-		dp = list_first_entry(&reply_head, struct dns_pkt, list);
-		list_del(&dp->list);
-		dns_del(dp);
-	}
-}
-
+static int parse_opt(int argc, char **argv);
+static int parse_pkt(const char *pcap);
+static int is_dns(const u_char *pkt);
 static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt);
+static void del_list(void);
 
 int main(int argc, char **argv)
 {
-	pcap_t *descr;
-	char err[PCAP_ERRBUF_SIZE];
 
-	if (argc < 2) {
-		ERR("Need a file to read\n");
+	if (parse_opt(argc, argv))
 		return -1;
-	}
-	descr = pcap_open_offline(argv[1], err);
-	if (!descr) {
-		ERR("open pcap file %s failed: %s\n", argv[1], err);
-		return -1;
-	}
 
-	if (pcap_loop(descr, 0, cb_pkt, NULL) < 0) {
-		ERR("packet_loop failed: %s\n", err);
-		return -1;
+	if (is_single_file) {
+		PRT("single file name: %s\n", file_name);
+		if (parse_pkt(file_name))
+			return -1;
+	}
+	else {
+		//for each file in file list, run parse_pkt
+		char *line = NULL;
+		size_t len = 0;
+		ssize_t read;
+		FILE *fp = fopen(file_name, "r");
+		if (!fp) {
+			ERR("Open file %s failed\n", file_name);
+			return -1;
+		}
+
+		while ((read = getline(&line, &len, fp)) != -1) {
+			if (line[read - 1] == '\n')
+				line[read - 1] = 0;
+			if (parse_pkt(line)) {
+				fclose(fp);
+				return -1;
+			}
+		}
+		fclose(fp);
 	}
 
 	DBG("ready to check tunnel\n");
@@ -63,7 +69,45 @@ int main(int argc, char **argv)
 	return 0;
 }
 
-static int is_dns(const u_char *pkt)
+int parse_opt(int argc, char **argv)
+{
+	struct option opts[] = {
+		{ "single", 0, 0, 's' },
+		{ 0, 0, 0, 0 },
+	};
+
+	int idx, res;
+	while ((res = getopt_long(argc, argv, "s", opts, &idx)) != -1) {
+		switch (res) {
+		case 's':
+			is_single_file = 1;
+			break;
+		default:
+			return -1;
+		}
+	}
+	if (optind < argc)
+		file_name = strdup(argv[optind]);
+	else
+		return -1;
+	return 0;
+}
+int parse_pkt(const char *pcap)
+{
+	char err[PCAP_ERRBUF_SIZE];
+	pcap_t *descr = pcap_open_offline(pcap, err);
+	if (!descr) {
+		ERR("open pcap file %s failed: %s\n", pcap, err);
+		return -1;
+	}
+
+	if (pcap_loop(descr, 0, cb_pkt, NULL) < 0) {
+		ERR("packet_loop failed: %s\n", err);
+		return -1;
+	}
+	return 0;
+}
+int is_dns(const u_char *pkt)
 {
 	const struct ether_header *eh;
 	const struct ip *iph;
@@ -99,8 +143,7 @@ static int is_dns(const u_char *pkt)
 
 	return 0;
 }
-
-static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt)
+void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt)
 {
 	struct dns_pkt *dp;
 	int offset;
@@ -123,6 +166,21 @@ static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pk
 		break;
 	default:
 		break;
+	}
+}
+void del_list(void)
+{
+	struct dns_pkt *dp;
+	while (!list_empty(&query_head)) {
+		dp = list_first_entry(&query_head, struct dns_pkt, list);
+		list_del(&dp->list);
+		dns_del(dp);
+	}
+
+	while (!list_empty(&reply_head)) {
+		dp = list_first_entry(&reply_head, struct dns_pkt, list);
+		list_del(&dp->list);
+		dns_del(dp);
 	}
 }
 
