@@ -7,14 +7,14 @@ struct policy {
 	const char *name;
 	unsigned int (*handle)(void *);
 };
-enum {
-	POLICY_REQ,
-	POLICY_QUEST,
-	POLICY_MAX,
-};
+
 enum {
 	POLICY_REQ_SIZE,
 	POLICY_REQ_MAX,
+};
+enum {
+	POLICY_REP_SIZE,
+	POLICY_REP_MAX,
 };
 
 enum {
@@ -29,6 +29,8 @@ int policy_req_init(void);
 
 struct policy *get_policy_req(void);
 struct policy *get_policy_quest(void);
+
+struct policy *get_policy_rep(void);
 
 #endif
 

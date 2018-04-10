@@ -4,6 +4,7 @@
 #include "list.h"
 
 void post_proc_req(struct list_head *head);
+void post_proc_rep(struct list_head *head);
 
 #endif
 

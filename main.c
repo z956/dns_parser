@@ -64,6 +64,7 @@ int main(int argc, char **argv)
 
 	DBG("ready to check tunnel\n");
 	post_proc_req(&query_head);
+	post_proc_rep(&reply_head);
 
 	del_list();
 	DBG("parse pcap done\n");

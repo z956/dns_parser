@@ -5,10 +5,11 @@
 #define _DNS_PARSER_DBG_
 #include "common.h"
 
+static unsigned int policy_pkt_size(void *data);
+
 /* request policy */
-static unsigned int policy_req_size(void *data);
 static struct policy policy_req[] = {
-	[POLICY_REQ_SIZE] = { "POLICY_REQ_SIZE", policy_req_size },
+	[POLICY_REQ_SIZE] = { "POLICY_REQ_SIZE", policy_pkt_size },
 };
 
 /* quest policy */
@@ -21,6 +22,11 @@ static struct policy policy_quest[] = {
 	[POLICY_QUEST_LABEL_SIZE] = { "POLICY_QUEST_LABEL_SIZE", policy_quest_label_size },
 	[POLICY_QUEST_UNIQUE_CHAR] = { "POLICY_QUEST_UNIQUE_CHAR", policy_quest_unique_char },
 	[POLICY_QUEST_LONGEST_REPEAT] = { "POLICY_QUEST_LONGEST_REPEAT", policy_quest_longest_repeat },
+};
+
+/* response policy */
+static struct policy policy_rep[] = {
+	[POLICY_REP_SIZE] = { "POLICY_REP_SIZE", policy_pkt_size },
 };
 
 int policy_req_init(void)
@@ -37,9 +43,12 @@ struct policy *get_policy_quest(void)
 {
 	return policy_quest;
 }
+struct policy *get_policy_rep(void)
+{
+	return policy_rep;
+}
 
-/* request policy */
-unsigned int policy_req_size(void *data)
+unsigned int policy_pkt_size(void *data)
 {
 	struct dns_pkt *dp = data;
 	return dp? dp->len : 0;

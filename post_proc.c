@@ -46,4 +46,22 @@ void post_proc_req(struct list_head *head)
 		print_stats(&quest_stats[i]);
 }
 
+void post_proc_rep(struct list_head *head)
+{
+	struct dns_pkt *dp, *tmp;
+	struct policy *rep_policy = get_policy_rep();
+	unsigned int pkt_count = 0;
+	struct stats rep_stats[POLICY_REP_MAX];
+
+	for (int i = 0; i < POLICY_REP_MAX; i++)
+		init_stats(rep_policy[i].name, &rep_stats[i]);
+
+	list_for_each_entry_safe (dp, tmp, head, list) {
+		apply_policy(rep_policy, POLICY_REP_MAX, dp, rep_stats);
+		pkt_count++;
+	}
+	PRT("Total response packets: %u\n", pkt_count);
+	for (int i = 0; i < POLICY_REP_MAX; i++)
+		print_stats(&rep_stats[i]);
+}
 
