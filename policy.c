@@ -5,6 +5,10 @@
 #define _DNS_PARSER_DBG_
 #include "common.h"
 
+#define policy_field(name, fn) \
+	[name] = { #name, fn }
+
+/* generic handler */
 static unsigned int policy_pkt_size(void *data);
 static unsigned int policy_type_a(void *data);
 static unsigned int policy_type_aaaa(void *data);
@@ -15,7 +19,7 @@ static unsigned int policy_type_cname(void *data);
 
 /* request policy */
 static struct policy policy_req[] = {
-	[POLICY_REQ_SIZE] = { "POLICY_REQ_SIZE", policy_pkt_size },
+	policy_field(POLICY_REQ_SIZE, policy_pkt_size),
 };
 
 /* quest policy */
@@ -24,32 +28,31 @@ static unsigned int policy_quest_label_size(void *data);
 static unsigned int policy_quest_unique_char(void *data);
 static unsigned int policy_quest_longest_repeat(void *data);
 static struct policy policy_quest[] = {
-	[POLICY_QUEST_NAME_SIZE] = { "POLICY_QUEST_NAME_SIZE", policy_quest_name_size },
-	[POLICY_QUEST_LABEL_SIZE] = { "POLICY_QUEST_LABEL_SIZE", policy_quest_label_size },
-	[POLICY_QUEST_UNIQUE_CHAR] = { "POLICY_QUEST_UNIQUE_CHAR", policy_quest_unique_char },
-	[POLICY_QUEST_LONGEST_REPEAT] = { "POLICY_QUEST_LONGEST_REPEAT", policy_quest_longest_repeat },
-
-	[POLICY_QUEST_TYPE_A] = { "POLICY_QUEST_TYPE_A", policy_type_a },
-	[POLICY_QUEST_TYPE_AAAA] = { "POLICY_QUEST_TYPE_AAAA", policy_type_aaaa },
-	[POLICY_QUEST_TYPE_NULL] = { "POLICY_QUEST_TYPE_NULL", policy_type_null },
-	[POLICY_QUEST_TYPE_TXT] = { "POLICY_QUEST_TYPE_TXT", policy_type_txt },
-	[POLICY_QUEST_TYPE_MX] = { "POLICY_QUEST_TYPE_MX", policy_type_mx },
-	[POLICY_QUEST_TYPE_CNAME] = { "POLICY_QUEST_TYPE_CNAME", policy_type_cname },
+	policy_field(POLICY_QUEST_NAME_SIZE, policy_quest_name_size),
+	policy_field(POLICY_QUEST_LABEL_SIZE, policy_quest_label_size),
+	policy_field(POLICY_QUEST_UNIQUE_CHAR, policy_quest_unique_char),
+	policy_field(POLICY_QUEST_LONGEST_REPEAT, policy_quest_longest_repeat),
+	policy_field(POLICY_QUEST_TYPE_A, policy_type_a),
+	policy_field(POLICY_QUEST_TYPE_AAAA, policy_type_aaaa),
+	policy_field(POLICY_QUEST_TYPE_NULL, policy_type_null),
+	policy_field(POLICY_QUEST_TYPE_TXT, policy_type_txt),
+	policy_field(POLICY_QUEST_TYPE_MX, policy_type_mx),
+	policy_field(POLICY_QUEST_TYPE_CNAME, policy_type_cname),
 };
 
 /* response policy */
 static struct policy policy_rep[] = {
-	[POLICY_REP_SIZE] = { "POLICY_REP_SIZE", policy_pkt_size },
+	policy_field(POLICY_REP_SIZE, policy_pkt_size),
 };
 
 /* answer poilcy */
 static struct policy policy_ans[] = {
-	[POLICY_ANS_TYPE_A] = { "POLICY_ANS_TYPE_A", policy_type_a },
-	[POLICY_ANS_TYPE_AAAA] = { "POLICY_ANS_TYPE_AAAA", policy_type_aaaa },
-	[POLICY_ANS_TYPE_NULL] = { "POLICY_ANS_TYPE_NULL", policy_type_null },
-	[POLICY_ANS_TYPE_TXT] = { "POLICY_ANS_TYPE_TXT", policy_type_txt },
-	[POLICY_ANS_TYPE_MX] = { "POLICY_ANS_TYPE_MX", policy_type_mx },
-	[POLICY_ANS_TYPE_CNAME] = { "POLICY_ANS_TYPE_CNAME", policy_type_cname },
+	policy_field(POLICY_ANS_TYPE_A, policy_type_a),
+	policy_field(POLICY_ANS_TYPE_AAAA, policy_type_aaaa),
+	policy_field(POLICY_ANS_TYPE_NULL, policy_type_null),
+	policy_field(POLICY_ANS_TYPE_TXT, policy_type_txt),
+	policy_field(POLICY_ANS_TYPE_MX, policy_type_mx),
+	policy_field(POLICY_ANS_TYPE_CNAME, policy_type_cname),
 };
 
 struct policy *get_policy_req(void)
@@ -69,6 +72,7 @@ struct policy *get_policy_ans(void)
 	return policy_ans;
 }
 
+/* generic handler */
 unsigned int policy_pkt_size(void *data)
 {
 	struct dns_pkt *dp = data;
