@@ -50,19 +50,32 @@ void post_proc_rep(struct list_head *head)
 {
 	struct dns_pkt *dp, *tmp;
 	struct policy *rep_policy = get_policy_rep();
-	unsigned int pkt_count = 0;
+	struct policy *ans_policy = get_policy_ans();
+	unsigned int pkt_count = 0, ans_count = 0;
 	struct stats rep_stats[POLICY_REP_MAX];
+	struct stats ans_stats[POLICY_ANS_MAX];
 
 	for (int i = 0; i < POLICY_REP_MAX; i++)
 		init_stats(rep_policy[i].name, &rep_stats[i]);
+	for (int i = 0; i < POLICY_ANS_MAX; i++)
+		init_stats(ans_policy[i].name, &ans_stats[i]);
 
 	list_for_each_entry_safe (dp, tmp, head, list) {
+		for (int i = 0; i < dp->hdr->an_count; i++) {
+			apply_policy(ans_policy, POLICY_ANS_MAX,
+					&dp->answers[i], ans_stats);
+		}
+		ans_count += dp->hdr->an_count;
+
 		apply_policy(rep_policy, POLICY_REP_MAX, dp, rep_stats);
 		pkt_count++;
 	}
 
 	PRT("Total response packets: %u\n", pkt_count);
+	PRT("Total answers: %u\n", ans_count);
 	for (int i = 0; i < POLICY_REP_MAX; i++)
 		print_stats(&rep_stats[i]);
+	for (int i = 0; i < POLICY_ANS_MAX; i++)
+		print_stats(&ans_stats[i]);
 }
 
