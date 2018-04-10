@@ -89,6 +89,7 @@ struct dns_answer {
 
 struct dns_pkt {
 	struct list_head list;
+	unsigned int len;
 	struct dns_header *hdr;
 	struct dns_quest *quests;
 	struct dns_answer *answers;
@@ -100,6 +101,10 @@ void dns_del(struct dns_pkt *dp);
 static inline int dns_qr(const struct dns_header *hdr)
 {
 	return hdr? DNS_FLAG_QR(hdr->flag_code) : -1;
+}
+static inline int dns_opcode(const struct dns_header *hdr)
+{
+	return hdr? DNS_FLAG_OPCODE(hdr->flag_code) : -1;
 }
 
 #endif

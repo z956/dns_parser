@@ -12,6 +12,33 @@ struct pkt_proc {
 	unsigned int len;
 };
 
+static int dns_header_valid(struct dns_header *dh)
+{
+	uint16_t id = ntohs(dh->id);
+	int flag_code = ntohs(dh->flag_code);
+
+	int qr = DNS_FLAG_QR(flag_code);
+	int opcode = DNS_FLAG_OPCODE(flag_code);
+
+	switch (qr) {
+	case DNS_QR_QUERY:
+	case DNS_QR_REPLY:
+		break;
+	default:
+		ERR("Invalid qr, id: 0x%04x, qr: %d\n", id, qr);
+		return 0;
+	}
+
+	switch (opcode) {
+	case DNS_OPCODE_QUERY:
+	case DNS_OPCODE_IQUERY:
+		break;
+	default:
+		ERR("Not expect opcode, id: 0x%04x, op: %d\n", id, opcode);
+		return 0;
+	}
+	return 1;
+}
 static struct dns_header *dns_header_alloc(struct pkt_proc *pp)
 {
 	struct dns_header *h, *dh;
@@ -21,13 +48,18 @@ static struct dns_header *dns_header_alloc(struct pkt_proc *pp)
 		return NULL;
 	}
 
+	h = (struct dns_header *)(pp->pkt + pp->offset);
+	if (!dns_header_valid(h)) {
+		ERR("Not expected header\n");
+		return NULL;
+	}
+
 	dh = calloc(1, sizeof(struct dns_header));
 	if (!dh) {
 		ERR("Cannot alloc for dns header\n");
 		return NULL;
 	}
 
-	h = (struct dns_header *)(pp->pkt + pp->offset);
 	pp->offset += sizeof(struct dns_header);
 
 	dh->id = ntohs(h->id);
@@ -255,6 +287,7 @@ struct dns_pkt *dns_alloc(const u_char *pkt, unsigned int len)
 	}
 
 	INIT_LIST_HEAD(&dp->list);
+	dp->len = len;
 
 	pp.pkt = pkt;
 	pp.offset = 0;

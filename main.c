@@ -128,12 +128,16 @@ static void check_query(void)
 {
 	struct dns_pkt *dp, *tmp;
 
-	struct statistic query_name_len, query_unique_char, query_longest_repeat;
+	struct statistic query_name_len,
+			 query_unique_char,
+			 query_longest_repeat,
+			 query_len;
 
+	init_statistic(&query_len);
 	init_statistic(&query_name_len);
 	init_statistic(&query_unique_char);
 	init_statistic(&query_longest_repeat);
-	unsigned int qd_count = 0;
+	unsigned int qd_count = 0, pkt_count = 0;
 	list_for_each_entry_safe (dp, tmp, &query_head, list) {
 		int i;
 		for (i = 0; i < dp->hdr->qd_count; i++) {
@@ -156,9 +160,14 @@ static void check_query(void)
 			update_statistic(&query_longest_repeat, longest_len);
 			qd_count++;
 		}
+
+		update_statistic(&query_len, dp->len);
+		pkt_count++;
 	}
 
+	PRT("Total query packet: %u\n", pkt_count);
 	PRT("Total question: %u\n", qd_count);
+	print_statistic("Query packet len", &query_len, pkt_count);
 	print_statistic("Query domain name len", &query_name_len, qd_count);
 	print_statistic("Query unique char len", &query_unique_char, qd_count);
 	print_statistic("Query longest repeat len", &query_longest_repeat, qd_count);
