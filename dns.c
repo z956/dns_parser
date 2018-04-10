@@ -135,7 +135,7 @@ static int parse_quest_section(struct pkt_proc *pp,
 				int qd_count, struct dns_quest *dq)
 {
 	for (int i = 0; i < qd_count; i++) {
-		if (parse_domain_name(pp, &dq[i].name) < 0) {
+		if (parse_domain_name(pp, &dq[i].base.qname) < 0) {
 			ERR("parse_domain_name %d failed\n", i);
 			return -1;
 		}
@@ -145,10 +145,10 @@ static int parse_quest_section(struct pkt_proc *pp,
 			ERR("Invalid pkt\n");
 			return -1;
 		}
-		dq[i].qtype = ntohs(*(uint16_t *)(pp->pkt + pp->offset));
+		dq[i].base.qtype = ntohs(*(uint16_t *)(pp->pkt + pp->offset));
 		pp->offset += sizeof(uint16_t);
 
-		dq[i].qclass = ntohs(*(uint16_t *)(pp->pkt + pp->offset));
+		dq[i].base.qclass = ntohs(*(uint16_t *)(pp->pkt + pp->offset));
 		pp->offset += sizeof(uint16_t);
 	}
 	return 0;
@@ -181,7 +181,7 @@ static int parse_answer_section(struct pkt_proc *pp,
 				int ans_count, struct dns_answer *ans)
 {
 	for (int i = 0; i < ans_count; i++) {
-		if (parse_domain_name(pp, &ans[i].name) < 0) {
+		if (parse_domain_name(pp, &ans[i].base.qname) < 0) {
 			ERR("parse_domain_name %d failed\n", i);
 			return -1;
 		}
@@ -191,10 +191,10 @@ static int parse_answer_section(struct pkt_proc *pp,
 			return -1;
 		}
 
-		ans[i].qtype = ntohs(*(uint16_t *)(pp->pkt + pp->offset));
+		ans[i].base.qtype = ntohs(*(uint16_t *)(pp->pkt + pp->offset));
 		pp->offset += sizeof(uint16_t);
 
-		ans[i].qclass = ntohs(*(uint16_t *)(pp->pkt + pp->offset));
+		ans[i].base.qclass = ntohs(*(uint16_t *)(pp->pkt + pp->offset));
 		pp->offset += sizeof(uint16_t);
 
 		ans[i].ttl = ntohl(*(uint32_t *)(pp->pkt + pp->offset));
@@ -203,13 +203,15 @@ static int parse_answer_section(struct pkt_proc *pp,
 		ans[i].rd_len = ntohs(*(uint16_t *)(pp->pkt + pp->offset));
 		pp->offset += sizeof(uint16_t);
 
-		DBG("type: %d, class: %d, ttl: %d, rd_len: %d\n", ans[i].qtype, ans[i].qclass, ans[i].ttl, ans[i].rd_len);
+		DBG("type: %d, class: %d, ttl: %d, rd_len: %d\n",
+			ans[i].base.qtype, ans[i].base.qclass,
+			ans[i].ttl, ans[i].rd_len);
 		if (pp->offset + ans[i].rd_len > pp->len) {
 			ERR("Invalid pkt\n");
 			return -1;
 		}
 
-		switch (ans[i].qtype) {
+		switch (ans[i].base.qtype) {
 		case DNS_TYPE_A:
 			ans[i].addr[0] = ntohl(*(uint32_t *)(pp->pkt + pp->offset));
 			pp->offset += sizeof(uint32_t);
@@ -253,7 +255,7 @@ static int parse_answer_section(struct pkt_proc *pp,
 			}
 			break;
 		default:
-			ERR("unknown type(%d)\n", ans[i].qtype);
+			ERR("unknown type(%d)\n", ans[i].base.qtype);
 			return -1;
 		}
 	}
@@ -346,7 +348,7 @@ void dns_del(struct dns_pkt *dp)
 
 	if (dp->hdr && dp->answers) {
 		for (int i = 0; i < dp->hdr->an_count; i++) {
-			switch (dp->answers[i].qtype) {
+			switch (dp->answers[i].base.qtype) {
 			case DNS_TYPE_NULL:
 			case DNS_TYPE_TXT:
 				free(dp->answers[i].data);

@@ -68,16 +68,19 @@ struct domain_name {
 	int len;
 	unsigned char name[MAX_DOMAIN_LEN];
 };
-struct dns_quest {
-	struct domain_name name;
+
+struct dns_sec_base {
+	struct domain_name qname;
 	uint16_t qtype;
 	uint16_t qclass;
 };
 
+struct dns_quest {
+	struct dns_sec_base base;
+};
+
 struct dns_answer {
-	struct domain_name name;
-	uint16_t qtype;
-	uint16_t qclass;
+	struct dns_sec_base base;
 	uint32_t ttl;
 	uint16_t rd_len;
 	union {

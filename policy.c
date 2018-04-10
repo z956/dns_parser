@@ -52,14 +52,14 @@ unsigned int policy_pkt_size(void *data)
 unsigned int policy_quest_name_size(void *data)
 {
 	struct dns_quest *quest = data;
-	return quest? quest->name.len : 0;
+	return quest? quest->base.qname.len : 0;
 }
 unsigned int policy_quest_label_size(void *data)
 {
 	struct dns_quest *quest = data;
 	if (quest) {
 		//count the avg of the 1st and 2nd label
-		unsigned char *p = quest->name.name;
+		unsigned char *p = quest->base.qname.name;
 
 		//1st
 		int label1_len = *p;
@@ -82,8 +82,8 @@ unsigned int policy_quest_unique_char(void *data)
 	if (quest) {
 		unsigned char charset[256];
 		unsigned int r = 0;
-		int len = quest->name.len;
-		const unsigned char *name = quest->name.name;
+		int len = quest->base.qname.len;
+		const unsigned char *name = quest->base.qname.name;
 
 		memset(charset, 0, 256);
 		for (int i = 0; i < len; i++)
@@ -101,8 +101,8 @@ unsigned int policy_quest_longest_repeat(void *data)
 	struct dns_quest *quest = data;
 
 	if (quest) {
-		int len = quest->name.len;
-		const unsigned char *name = quest->name.name;
+		int len = quest->base.qname.len;
+		const unsigned char *name = quest->base.qname.name;
 
 		unsigned int max_len = 0;
 		unsigned int non_vowel_len = 0;
