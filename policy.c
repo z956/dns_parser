@@ -29,12 +29,6 @@ static struct policy policy_rep[] = {
 	[POLICY_REP_SIZE] = { "POLICY_REP_SIZE", policy_pkt_size },
 };
 
-int policy_req_init(void)
-{
-	//FIXME should imp?
-	return 0;
-}
-
 struct policy *get_policy_req(void)
 {
 	return policy_req;

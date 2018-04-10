@@ -25,8 +25,6 @@ enum {
 	POLICY_QUEST_MAX,
 };
 
-int policy_req_init(void);
-
 struct policy *get_policy_req(void);
 struct policy *get_policy_quest(void);
 
