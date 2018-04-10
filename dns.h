@@ -82,7 +82,7 @@ struct dns_answer {
 	uint16_t rd_len;
 	union {
 		uint32_t addr[4]; //A and AAAA
-		struct domain_name cname; //CNAME, NS
+		struct domain_name content_name; //CNAME, NS, MX
 		unsigned char *data; //NULL, TXT
 	};
 };

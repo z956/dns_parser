@@ -217,7 +217,7 @@ static int parse_answer_section(struct pkt_proc *pp,
 //		case DNS_TYPE_NS:
 //			break;
 		case DNS_TYPE_CNAME:
-			if (parse_domain_name(pp, &ans[i].cname) < 0) {
+			if (parse_domain_name(pp, &ans[i].content_name) < 0) {
 				ERR("parse_domain_name cname failed\n");
 				return -1;
 			}
@@ -228,8 +228,18 @@ static int parse_answer_section(struct pkt_proc *pp,
 			ans[i].data[ans[i].rd_len] = 0;
 			pp->offset += ans[i].rd_len;
 			break;
-//		case DNS_TYPE_MX:
-//			break;
+		case DNS_TYPE_MX:
+			//ignore preference
+			if (pp->offset + sizeof(uint16_t) > pp->len) {
+				ERR("Invalid packet\n");
+				return -1;
+			}
+			pp->offset += sizeof(uint16_t);
+			if (parse_domain_name(pp, &ans[i].content_name) < 0) {
+				ERR("parse_domain_name mx failed\n");
+				return -1;
+			}
+			break;
 		case DNS_TYPE_TXT:
 			ans[i].data = malloc(ans[i].rd_len + 1);
 			memcpy(ans[i].data, pp->pkt + pp->offset, ans[i].rd_len);
@@ -243,7 +253,7 @@ static int parse_answer_section(struct pkt_proc *pp,
 			}
 			break;
 		default:
-			DBG("unknown type\n");
+			ERR("unknown type(%d)\n", ans[i].qtype);
 			return -1;
 		}
 	}
