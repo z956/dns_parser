@@ -32,7 +32,6 @@ static int dns_header_valid(struct dns_header *dh)
 
 	switch (opcode) {
 	case DNS_OPCODE_QUERY:
-	case DNS_OPCODE_IQUERY:
 		break;
 	default:
 		ERR("Not expect opcode, id: 0x%04x, op: %d\n", id, opcode);
@@ -157,6 +156,12 @@ static int parse_quest_section(struct pkt_proc *pp,
 static int dns_query(struct dns_pkt *dp, struct pkt_proc *pp)
 {
 	const struct dns_header *hdr = dp->hdr;
+
+	if (hdr->qd_count == 0) {
+		ERR("request(0x%04x) does not have question section\n", hdr->id);
+		return -1;
+	}
+
 	struct dns_quest *dq = calloc(hdr->qd_count, sizeof(struct dns_quest));
 	if (!dq) {
 		ERR("Cannot allocate for dns quest\n");
