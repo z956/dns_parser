@@ -18,9 +18,6 @@
 static LIST_HEAD(query_head);
 static LIST_HEAD(reply_head);
 
-static LIST_HEAD(non_tunnel_head);
-static LIST_HEAD(tunnel_head);
-
 static void del_list(void)
 {
 	struct dns_pkt *dp;
@@ -32,17 +29,6 @@ static void del_list(void)
 
 	while (!list_empty(&reply_head)) {
 		dp = list_first_entry(&reply_head, struct dns_pkt, list);
-		list_del(&dp->list);
-		dns_del(dp);
-	}
-
-	while (!list_empty(&non_tunnel_head)) {
-		dp = list_first_entry(&non_tunnel_head, struct dns_pkt, list);
-		list_del(&dp->list);
-		dns_del(dp);
-	}
-	while (!list_empty(&tunnel_head)) {
-		dp = list_first_entry(&tunnel_head, struct dns_pkt, list);
 		list_del(&dp->list);
 		dns_del(dp);
 	}
