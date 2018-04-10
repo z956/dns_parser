@@ -13,10 +13,12 @@ static struct policy policy_req[] = {
 
 /* quest policy */
 static unsigned int policy_quest_name_size(void *data);
+static unsigned int policy_quest_label_size(void *data);
 static unsigned int policy_quest_unique_char(void *data);
 static unsigned int policy_quest_longest_repeat(void *data);
 static struct policy policy_quest[] = {
 	[POLICY_QUEST_NAME_SIZE] = { "POLICY_QUEST_NAME_SIZE", policy_quest_name_size },
+	[POLICY_QUEST_LABEL_SIZE] = { "POLICY_QUEST_LABEL_SIZE", policy_quest_label_size },
 	[POLICY_QUEST_UNIQUE_CHAR] = { "POLICY_QUEST_UNIQUE_CHAR", policy_quest_unique_char },
 	[POLICY_QUEST_LONGEST_REPEAT] = { "POLICY_QUEST_LONGEST_REPEAT", policy_quest_longest_repeat },
 };
@@ -48,6 +50,27 @@ unsigned int policy_quest_name_size(void *data)
 {
 	struct dns_quest *quest = data;
 	return quest? quest->name.len : 0;
+}
+unsigned int policy_quest_label_size(void *data)
+{
+	struct dns_quest *quest = data;
+	if (quest) {
+		//count the avg of the 1st and 2nd label
+		unsigned char *p = quest->name.name;
+
+		//1st
+		int label1_len = *p;
+		if (label1_len == 0)
+			return 0;
+		p += label1_len + 1;
+		int label2_len = *p;
+
+		if (label2_len == 0)
+			return label1_len;
+		return (label1_len + label2_len) / 2;
+	}
+	else
+		return 0;
 }
 unsigned int policy_quest_unique_char(void *data)
 {

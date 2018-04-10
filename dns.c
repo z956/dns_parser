@@ -119,7 +119,7 @@ static int parse_domain_name(struct pkt_proc *pp, struct domain_name *name)
 			label_len--;
 		}
 		else {
-			name->name[total_len++] = '.';
+			name->name[total_len++] = *p;
 			label_len = *p;
 			p++;
 		}
@@ -130,7 +130,6 @@ static int parse_domain_name(struct pkt_proc *pp, struct domain_name *name)
 	name->len = total_len;
 	if (!in_ptr)
 		pp->offset++;
-	DBG("parsed domain name %d, %s, offset: %d\n", name->len, name->name, pp->offset);
 	return total_len;
 }
 static int parse_quest_section(struct pkt_proc *pp,
