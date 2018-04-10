@@ -39,21 +39,10 @@ int main(int argc, char **argv)
 {
 	pcap_t *descr;
 	char err[PCAP_ERRBUF_SIZE];
-	int print_tunnel = 1, print_non_tunnel = 1;
 
 	if (argc < 2) {
 		ERR("Need a file to read\n");
 		return -1;
-	}
-	if (argc > 2) {
-		if (strcmp(argv[2], "-t") == 0) {
-			print_tunnel = 1;
-			print_non_tunnel = 0;
-		}
-		else if (strcmp(argv[2], "-n") == 0) {
-			print_tunnel = 0;
-			print_non_tunnel = 1;
-		}
 	}
 	descr = pcap_open_offline(argv[1], err);
 	if (!descr) {
@@ -127,13 +116,6 @@ static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pk
 
 	switch (dns_qr(dp->hdr)) {
 	case DNS_QR_QUERY:
-		DBG("after parse, is query, check qd for id 0x%04x\n", dp->hdr->id);
-		{
-			int i;
-			for (i = 0; i < dp->hdr->qd_count; i++) {
-				DBG("qd(%d), len(%u)\n", i, dp->quests[i].name.len);
-			}
-		}
 		list_add_tail(&dp->list, &query_head);
 		break;
 	case DNS_QR_REPLY:
