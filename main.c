@@ -12,6 +12,7 @@
 #include "dns.h"
 #include "common.h"
 #include "statistics.h"
+#include "policy.h"
 #include "list.h"
 
 static LIST_HEAD(query_head);
@@ -48,133 +49,47 @@ static void del_list(void)
 }
 
 static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt);
-static unsigned int get_unique_char(const unsigned char *str, int len)
-{
-	unsigned char charset[256];
-	int i;
-	unsigned int r = 0;
 
-	memset(charset, 0, 256);
-	for (i = 0; i < len; i++) {
-		charset[str[i]]++;
-	}
-
-	for (i = 0; i < 256; i++) {
-		r += !!charset[i];
-	}
-	return r;
-}
-static unsigned int get_longest_repeat(const unsigned char *str, int len)
+static void apply_policy(struct policy *p, int count, void *data, struct statistics *sts)
 {
 	int i;
-	unsigned int max_len = 0;
-	unsigned int non_vowel_len = 0;
-	for (i = 0; i < len; i++) {
-		switch (str[i]) {
-		case 'a':
-		case 'e':
-		case 'i':
-		case 'o':
-		case 'u':
-		case 'A':
-		case 'E':
-		case 'I':
-		case 'O':
-		case 'U':
-		case '.':
-		case '-':
-			if (non_vowel_len > max_len)
-				max_len = non_vowel_len;
-			non_vowel_len = 0;
-			break;
-		default:
-			non_vowel_len++;
-			break;
-		}
+	for (i = 0; i < count; i++) {
+		unsigned int r = (p[i].handle)(data);
+		update_statistics(&sts[i], r);
 	}
-	return max_len;
 }
-
 static void check_query(void)
 {
 	struct dns_pkt *dp, *tmp;
+	int i;
+	struct policy *req_policy = get_policy_req();
+	struct policy *quest_policy = get_policy_quest();
 
-	struct statistics query_name_len,
-			 query_unique_char,
-			 query_longest_repeat,
-			 query_len;
+	struct statistics req_statistics[POLICY_REQ_MAX];
+	struct statistics quest_statistics[POLICY_QUEST_MAX];
 
-	init_statistics(&query_len);
-	init_statistics(&query_name_len);
-	init_statistics(&query_unique_char);
-	init_statistics(&query_longest_repeat);
+	for (i = 0; i < POLICY_REQ_MAX; i++)
+		init_statistics(req_policy[i].name, &req_statistics[i]);
+	for (i = 0; i < POLICY_QUEST_MAX; i++)
+		init_statistics(quest_policy[i].name, &quest_statistics[i]);
 	unsigned int qd_count = 0, pkt_count = 0;
 	list_for_each_entry_safe (dp, tmp, &query_head, list) {
-		int i;
 		for (i = 0; i < dp->hdr->qd_count; i++) {
-			struct domain_name *name = &dp->quests[i].name;
-			unsigned int domain_len = name->len;
-			unsigned int unique_len = get_unique_char(name->name, name->len);
-			unsigned int longest_len = get_longest_repeat(name->name, name->len);
-
-			if (longest_len < 15 && domain_len < 70) {
-				list_del_init(&dp->list);
-				list_add(&dp->list, &non_tunnel_head);
-			}
-			else {
-				list_del_init(&dp->list);
-				list_add(&dp->list, &tunnel_head);
-			}
-
-			update_statistics(&query_name_len, domain_len);
-			update_statistics(&query_unique_char, unique_len);
-			update_statistics(&query_longest_repeat, longest_len);
-			qd_count++;
+			apply_policy(quest_policy, POLICY_QUEST_MAX,
+					&dp->quests[i], quest_statistics);
 		}
+		qd_count += dp->hdr->qd_count;
 
-		update_statistics(&query_len, dp->len);
+		apply_policy(req_policy, POLICY_REQ_MAX, dp, req_statistics);
 		pkt_count++;
 	}
 
 	PRT("Total query packet: %u\n", pkt_count);
 	PRT("Total question: %u\n", qd_count);
-	print_statistics("Query packet len", &query_len, pkt_count);
-	print_statistics("Query domain name len", &query_name_len, qd_count);
-	print_statistics("Query unique char len", &query_unique_char, qd_count);
-	print_statistics("Query longest repeat len", &query_longest_repeat, qd_count);
-}
-static void print_tunnel_pkt(struct list_head *head)
-{
-	struct dns_pkt *dp;
-	unsigned int count = 0;
-	struct statistics name_len, unique_char, longest_repeat;
-	init_statistics(&name_len);
-	init_statistics(&unique_char);
-	init_statistics(&longest_repeat);
-
-	list_for_each_entry(dp, head, list) {
-		int i;
-		for (i = 0; i < dp->hdr->qd_count; i++) {
-			struct domain_name *name = &dp->quests[i].name;
-			unsigned int domain_len = name->len;
-			unsigned int unique_len = get_unique_char(name->name, name->len);
-			unsigned int longest_len = get_longest_repeat(name->name, name->len);
-
-			update_statistics(&name_len, domain_len);
-			update_statistics(&unique_char, unique_len);
-			update_statistics(&longest_repeat, longest_len);
-
-			PRT("id: 0x%04x, type: %d, name: %s\n",
-			dp->hdr->id, dp->quests[i].qtype, dp->quests[i].name.name);
-			count++;
-		}
-	}
-	if (count) {
-		PRT("Total packet: %u\n", count);
-		print_statistics("Domain name len", &name_len, count);
-		print_statistics("Unique char len", &unique_char, count);
-		print_statistics("Longest repeat len", &longest_repeat, count);
-	}
+	for (i = 0; i < POLICY_REQ_MAX; i++)
+		print_statistics(&req_statistics[i]);
+	for (i = 0; i < POLICY_QUEST_MAX; i++)
+		print_statistics(&quest_statistics[i]);
 }
 
 int main(int argc, char **argv)
@@ -210,16 +125,6 @@ int main(int argc, char **argv)
 
 	DBG("ready to check tunnel\n");
 	check_query();
-	if (print_tunnel) {
-		PRT("*** print tunnel pkt start\n");
-		print_tunnel_pkt(&tunnel_head);
-		PRT("*** print tunnel pkt end\n");
-	}
-	if (print_non_tunnel) {
-		PRT("*** print non-tunnel pkt start\n");
-		print_tunnel_pkt(&non_tunnel_head);
-		PRT("*** print non-tunnel pkt end\n");
-	}
 
 	del_list();
 	DBG("parse pcap done\n");
@@ -279,10 +184,17 @@ static void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pk
 
 	switch (dns_qr(dp->hdr)) {
 	case DNS_QR_QUERY:
-		list_add(&dp->list, &query_head);
+		DBG("after parse, is query, check qd for id 0x%04x\n", dp->hdr->id);
+		{
+			int i;
+			for (i = 0; i < dp->hdr->qd_count; i++) {
+				DBG("qd(%d), len(%u)\n", i, dp->quests[i].name.len);
+			}
+		}
+		list_add_tail(&dp->list, &query_head);
 		break;
 	case DNS_QR_REPLY:
-		list_add(&dp->list, &reply_head);
+		list_add_tail(&dp->list, &reply_head);
 		break;
 	default:
 		break;
