@@ -9,6 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <stdlib.h>
 
 #define _DNS_PARSER_DBG_
 #include "dns.h"
@@ -95,17 +96,22 @@ int parse_opt(int argc, char **argv)
 int parse_pkt(const char *pcap)
 {
 	char err[PCAP_ERRBUF_SIZE];
+	char *name;
+	int r = 0;
 	pcap_t *descr = pcap_open_offline(pcap, err);
 	if (!descr) {
 		ERR("open pcap file %s failed: %s\n", pcap, err);
 		return -1;
 	}
 
-	if (pcap_loop(descr, 0, cb_pkt, NULL) < 0) {
-		ERR("packet_loop failed: %s\n", err);
-		return -1;
+	name = strdup(pcap);
+	if (pcap_loop(descr, 0, cb_pkt, name) < 0) {
+		ERR("packet_loop failed on file %s: %s\n", name, err);
+		r = -1;
 	}
-	return 0;
+
+	free(name);
+	return r;
 }
 int is_dns(const u_char *pkt)
 {
@@ -153,7 +159,7 @@ void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt)
 	dns_len = hdr->caplen - offset;
 	dp = dns_alloc(pkt + offset, dns_len);
 	if (!dp) {
-		ERR("parse_dns failed\n");
+		ERR("parse_dns(%s) failed\n", data);
 		return;
 	}
 
