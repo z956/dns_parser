@@ -17,8 +17,8 @@
 #include "post_proc.h"
 #include "list.h"
 
-static LIST_HEAD(query_head);
-static LIST_HEAD(reply_head);
+static LIST_HEAD(req_head);
+static LIST_HEAD(rep_head);
 
 static int is_single_file;
 static char *file_name;
@@ -63,8 +63,8 @@ int main(int argc, char **argv)
 	}
 
 	DBG("ready to check tunnel\n");
-	post_proc_req(&query_head);
-	post_proc_rep(&reply_head);
+	post_proc_req(&req_head);
+	post_proc_rep(&rep_head);
 
 	del_list();
 	DBG("parse pcap done\n");
@@ -166,10 +166,10 @@ void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt)
 
 	switch (dns_qr(dp->hdr)) {
 	case DNS_QR_QUERY:
-		list_add_tail(&dp->list, &query_head);
+		list_add_tail(&dp->list, &req_head);
 		break;
 	case DNS_QR_REPLY:
-		list_add_tail(&dp->list, &reply_head);
+		list_add_tail(&dp->list, &rep_head);
 		break;
 	default:
 		break;
@@ -178,14 +178,14 @@ void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt)
 void del_list(void)
 {
 	struct dns_pkt *dp;
-	while (!list_empty(&query_head)) {
-		dp = list_first_entry(&query_head, struct dns_pkt, list);
+	while (!list_empty(&req_head)) {
+		dp = list_first_entry(&req_head, struct dns_pkt, list);
 		list_del(&dp->list);
 		dns_del(dp);
 	}
 
-	while (!list_empty(&reply_head)) {
-		dp = list_first_entry(&reply_head, struct dns_pkt, list);
+	while (!list_empty(&rep_head)) {
+		dp = list_first_entry(&rep_head, struct dns_pkt, list);
 		list_del(&dp->list);
 		dns_del(dp);
 	}
