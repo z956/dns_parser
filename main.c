@@ -31,7 +31,6 @@ static void del_list(void);
 
 int main(int argc, char **argv)
 {
-
 	if (parse_opt(argc, argv))
 		return -1;
 
