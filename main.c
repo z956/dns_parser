@@ -124,14 +124,14 @@ static void print_statistic(const char *tag, struct statistic *s, int n)
 		tag, s->total, ((double)s->total) / n,
 		s->max, s->min);
 }
-static void check_tunnel(void)
+static void check_query(void)
 {
 	struct dns_pkt *dp, *tmp;
 
-	struct statistic name_len, unique_char, longest_repeat;
-	init_statistic(&name_len);
-	init_statistic(&unique_char);
-	init_statistic(&longest_repeat);
+	struct statistic query_name_len, query_unique_char, query_longest_repeat;
+	init_statistic(&query_name_len);
+	init_statistic(&query_unique_char);
+	init_statistic(&query_longest_repeat);
 	unsigned int count = 0;
 	list_for_each_entry_safe(dp, tmp, &query_head, list) {
 		int i;
@@ -150,17 +150,17 @@ static void check_tunnel(void)
 				list_add(&dp->list, &tunnel_head);
 			}
 
-			update_statistic(&name_len, domain_len);
-			update_statistic(&unique_char, unique_len);
-			update_statistic(&longest_repeat, longest_len);
+			update_statistic(&query_name_len, domain_len);
+			update_statistic(&query_unique_char, unique_len);
+			update_statistic(&query_longest_repeat, longest_len);
 			count++;
 		}
 	}
 
 	PRT("Total packet: %u\n", count);
-	print_statistic("Domain name len", &name_len, count);
-	print_statistic("Unique char len", &unique_char, count);
-	print_statistic("Longest repeat len", &longest_repeat, count);
+	print_statistic("Query domain name len", &query_name_len, count);
+	print_statistic("Query unique char len", &query_unique_char, count);
+	print_statistic("Query longest repeat len", &query_longest_repeat, count);
 }
 static void print_tunnel_pkt(struct list_head *head)
 {
@@ -183,7 +183,7 @@ static void print_tunnel_pkt(struct list_head *head)
 			update_statistic(&unique_char, unique_len);
 			update_statistic(&longest_repeat, longest_len);
 
-			PRT("id: 0x%x, type: %d, name: %s\n",
+			PRT("id: 0x%04x, type: %d, name: %s\n",
 			dp->hdr->id, dp->quests[i].qtype, dp->quests[i].name.name);
 			count++;
 		}
@@ -228,7 +228,7 @@ int main(int argc, char **argv)
 	}
 
 	DBG("ready to check tunnel\n");
-	check_tunnel();
+	check_query();
 	if (print_tunnel) {
 		PRT("*** print tunnel pkt start\n");
 		print_tunnel_pkt(&tunnel_head);
