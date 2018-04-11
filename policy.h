@@ -3,9 +3,10 @@
 
 #include "dns.h"
 
+struct stats;
 struct policy {
 	const char *name;
-	unsigned int (*handle)(void *);
+	int (*handle)(void *, struct stats *);
 };
 
 enum {

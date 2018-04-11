@@ -3,19 +3,20 @@
 #include <string.h>
 
 #define _DNS_PARSER_DBG_
+#include "stats.h"
 #include "common.h"
 
 #define policy_field(name, fn) \
 	[name] = { #name, fn }
 
 /* generic handler */
-static unsigned int policy_pkt_size(void *data);
-static unsigned int policy_type_a(void *data);
-static unsigned int policy_type_aaaa(void *data);
-static unsigned int policy_type_null(void *data);
-static unsigned int policy_type_txt(void *data);
-static unsigned int policy_type_mx(void *data);
-static unsigned int policy_type_cname(void *data);
+static int policy_pkt_size(void *data, struct stats *st);
+static int policy_type_a(void *data, struct stats *st);
+static int policy_type_aaaa(void *data, struct stats *st);
+static int policy_type_null(void *data, struct stats *st);
+static int policy_type_txt(void *data, struct stats *st);
+static int policy_type_mx(void *data, struct stats *st);
+static int policy_type_cname(void *data, struct stats *st);
 
 /* request policy */
 static struct policy policy_req[] = {
@@ -23,10 +24,10 @@ static struct policy policy_req[] = {
 };
 
 /* quest policy */
-static unsigned int policy_quest_name_size(void *data);
-static unsigned int policy_quest_label_size(void *data);
-static unsigned int policy_quest_unique_char(void *data);
-static unsigned int policy_quest_longest_repeat(void *data);
+static int policy_quest_name_size(void *data, struct stats *st);
+static int policy_quest_label_size(void *data, struct stats *st);
+static int policy_quest_unique_char(void *data, struct stats *st);
+static int policy_quest_longest_repeat(void *data, struct stats *st);
 static struct policy policy_quest[] = {
 	policy_field(POLICY_QUEST_NAME_SIZE, policy_quest_name_size),
 	policy_field(POLICY_QUEST_LABEL_SIZE, policy_quest_label_size),
@@ -41,7 +42,7 @@ static struct policy policy_quest[] = {
 };
 
 /* response policy */
-static unsigned int policy_rep_nxdomain(void *data);
+static int policy_rep_nxdomain(void *data, struct stats *st);
 static struct policy policy_rep[] = {
 	policy_field(POLICY_REP_SIZE, policy_pkt_size),
 	policy_field(POLICY_REP_NXDOMAIN, policy_rep_nxdomain),
@@ -85,135 +86,184 @@ struct policy *get_policy_ans(void)
 }
 
 /* generic handler */
-unsigned int policy_pkt_size(void *data)
+int policy_pkt_size(void *data, struct stats *st)
 {
 	struct dns_pkt *dp = data;
-	return dp? dp->len : 0;
+	if (!dp || !st)
+		return -1;
+
+	update_stats(st, dp->len);
+	return 0;
 }
-unsigned int policy_type_a(void *data)
+int policy_type_a(void *data, struct stats *st)
 {
 	struct dns_sec_base *base = data;
-	return base? base->qtype == DNS_TYPE_A : 0;
+
+	if (!base || !st)
+		return -1;
+
+	update_stats(st, base->qtype == DNS_TYPE_A);
+	return 0;
 }
-unsigned int policy_type_aaaa(void *data)
+int policy_type_aaaa(void *data, struct stats *st)
 {
 	struct dns_sec_base *base = data;
-	return base? base->qtype == DNS_TYPE_AAAA : 0;
+
+	if (!base || !st)
+		return -1;
+
+	update_stats(st, base->qtype == DNS_TYPE_AAAA);
+	return 0;
 }
-unsigned int policy_type_null(void *data)
+int policy_type_null(void *data, struct stats *st)
 {
 	struct dns_sec_base *base = data;
-	return base? base->qtype == DNS_TYPE_NULL : 0;
+
+	if (!base || !st)
+		return -1;
+
+	update_stats(st, base->qtype == DNS_TYPE_NULL);
+	return 0;
 }
-unsigned int policy_type_txt(void *data)
+int policy_type_txt(void *data, struct stats *st)
 {
 	struct dns_sec_base *base = data;
-	return base? base->qtype == DNS_TYPE_TXT : 0;
+
+	if (!base || !st)
+		return -1;
+
+	update_stats(st, base->qtype == DNS_TYPE_TXT);
+	return 0;
 }
-unsigned int policy_type_mx(void *data)
+int policy_type_mx(void *data, struct stats *st)
 {
 	struct dns_sec_base *base = data;
-	return base? base->qtype == DNS_TYPE_MX : 0;
+
+	if (!base || !st)
+		return -1;
+
+	update_stats(st, base->qtype == DNS_TYPE_MX);
+	return 0;
 }
-unsigned int policy_type_cname(void *data)
+int policy_type_cname(void *data, struct stats *st)
 {
 	struct dns_sec_base *base = data;
-	return base? base->qtype == DNS_TYPE_CNAME : 0;
+
+	if (!base || !st)
+		return -1;
+
+	update_stats(st, base->qtype == DNS_TYPE_CNAME);
+	return 0;
 }
 
 /* quest policy */
-unsigned int policy_quest_name_size(void *data)
+int policy_quest_name_size(void *data, struct stats *st)
 {
 	struct dns_quest *quest = data;
-	return quest? quest->base.qname.len : 0;
-}
-unsigned int policy_quest_label_size(void *data)
-{
-	struct dns_quest *quest = data;
-	if (quest) {
-		//count the avg of the 1st and 2nd label
-		unsigned char *p = quest->base.qname.name;
 
-		//1st
-		int label1_len = *p;
-		if (label1_len == 0)
-			return 0;
+	if (!quest || !st)
+		return -1;
+
+	update_stats(st, quest->base.qname.len);
+	return 0;
+}
+int policy_quest_label_size(void *data, struct stats *st)
+{
+	struct dns_quest *quest = data;
+	if (!quest || !st)
+		return -1;
+
+	unsigned int r = 0;
+	//count the avg of the 1st and 2nd label
+	unsigned char *p = quest->base.qname.name;
+
+	//1st
+	int label1_len = *p;
+	if (label1_len == 0)
+		r = 0;
+	else {
 		p += label1_len + 1;
 		int label2_len = *p;
 
 		if (label2_len == 0)
-			return label1_len;
-		return (label1_len + label2_len) / 2;
+			r = label1_len;
+		else
+			r = (label1_len + label2_len) / 2;
 	}
-	else
-		return 0;
+	update_stats(st, r);
+	return 0;
 }
-unsigned int policy_quest_unique_char(void *data)
+int policy_quest_unique_char(void *data, struct stats *st)
 {
 	struct dns_quest *quest = data;
 
-	if (quest) {
-		unsigned char charset[256];
-		unsigned int r = 0;
-		int len = quest->base.qname.len;
-		unsigned char name[MAX_DOMAIN_LEN];
-		convert_domain_name(&quest->base.qname, name);
+	if (!quest || !st)
+		return -1;
 
-		memset(charset, 0, 256);
-		for (int i = 0; i < len; i++)
-			charset[name[i]]++;
+	unsigned char charset[256];
+	unsigned int r = 0;
+	int len = quest->base.qname.len;
+	unsigned char name[MAX_DOMAIN_LEN];
+	convert_domain_name(&quest->base.qname, name);
 
-		for (int i = 0; i < 256; i++)
-			r += !!charset[i];
-		return r;
-	}
-	else
-		return 0;
+	memset(charset, 0, 256);
+	for (int i = 0; i < len; i++)
+		charset[name[i]]++;
+
+	for (int i = 0; i < 256; i++)
+		r += !!charset[i];
+	update_stats(st, r);
+	return 0;
 }
-unsigned int policy_quest_longest_repeat(void *data)
+int policy_quest_longest_repeat(void *data, struct stats *st)
 {
 	struct dns_quest *quest = data;
 
-	if (quest) {
-		int len = quest->base.qname.len;
-		unsigned char name[MAX_DOMAIN_LEN];
-		convert_domain_name(&quest->base.qname, name);
+	if (!quest || !st)
+		return -1;
 
-		unsigned int max_len = 0;
-		unsigned int non_vowel_len = 0;
-		for (int i = 0; i < len; i++) {
-			switch (name[i]) {
-			case 'a':
-			case 'e':
-			case 'i':
-			case 'o':
-			case 'u':
-			case 'A':
-			case 'E':
-			case 'I':
-			case 'O':
-			case 'U':
-			case '.':
-			case '-':
-				if (non_vowel_len > max_len)
-					max_len = non_vowel_len;
-				non_vowel_len = 0;
-				break;
-			default:
-				non_vowel_len++;
-				break;
-			}
+	int len = quest->base.qname.len;
+	unsigned char name[MAX_DOMAIN_LEN];
+	convert_domain_name(&quest->base.qname, name);
+
+	unsigned int max_len = 0;
+	unsigned int non_vowel_len = 0;
+	for (int i = 0; i < len; i++) {
+		switch (name[i]) {
+		case 'a':
+		case 'e':
+		case 'i':
+		case 'o':
+		case 'u':
+		case 'A':
+		case 'E':
+		case 'I':
+		case 'O':
+		case 'U':
+		case '.':
+		case '-':
+			if (non_vowel_len > max_len)
+				max_len = non_vowel_len;
+			non_vowel_len = 0;
+			break;
+		default:
+			non_vowel_len++;
+			break;
 		}
-		return max_len;
 	}
-	else
-		return 0;
+	update_stats(st, max_len);
+	return 0;
 }
 
 /* response policy */
-unsigned int policy_rep_nxdomain(void *data)
+int policy_rep_nxdomain(void *data, struct stats *st)
 {
 	struct dns_pkt *dp = data;
-	return dp? DNS_FLAG_RCODE(dp->hdr->flag_code) == DNS_RCODE_NAME_ERR : 0;
+
+	if (!dp || !st)
+		return -1;
+
+	update_stats(st, DNS_FLAG_RCODE(dp->hdr->flag_code) == DNS_RCODE_NAME_ERR);
+	return 0;
 }
 

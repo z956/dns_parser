@@ -9,8 +9,8 @@
 static void apply_policy(struct policy *p, int count, void *data, struct stats *sts)
 {
 	for (int i = 0; i < count; i++) {
-		unsigned int r = (p[i].handle)(data);
-		update_stats(&sts[i], r);
+		if ((p[i].handle)(data, &sts[i]))
+			ERR("apply policy failed!\n");
 	}
 }
 void post_proc_req(struct list_head *head)
