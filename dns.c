@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <ctype.h>
 
 //#define _DNS_PARSER_DBG_
 #include "common.h"
@@ -375,5 +376,28 @@ void dns_del(struct dns_pkt *dp)
 	}
 	free(dp->answers);
 	free(dp->hdr);
+}
+void convert_domain_name(const struct domain_name *dn, unsigned char *name)
+{
+	memset(name, 0, MAX_DOMAIN_LEN);
+	memcpy(name, dn->name, dn->len);
+	int offset = 0;
+	while (offset < dn->len) {
+		int label_len = name[offset];
+		if (label_len == 0)
+			break;
+		name[offset] = '.';
+		offset += label_len + 1;
+	}
+}
+void printable_domain_name(const struct domain_name *dn, unsigned char *name)
+{
+	memset(name, 0, MAX_DOMAIN_LEN);
+	for (int i = 0; i < dn->len; i++) {
+		if (isprint(dn->name[i]))
+			name[i] = dn->name[i];
+		else
+			name[i] = '.';
+	}
 }
 

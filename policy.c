@@ -163,7 +163,8 @@ unsigned int policy_quest_longest_repeat(void *data)
 
 	if (quest) {
 		int len = quest->base.qname.len;
-		const unsigned char *name = quest->base.qname.name;
+		unsigned char name[MAX_DOMAIN_LEN];
+		convert_domain_name(&quest->base.qname, name);
 
 		unsigned int max_len = 0;
 		unsigned int non_vowel_len = 0;

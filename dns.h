@@ -124,4 +124,7 @@ static inline int is_checking_type(int type)
 	}
 }
 
+void printable_domain_name(const struct domain_name *dn, unsigned char *name);
+void convert_domain_name(const struct domain_name *dn, unsigned char *name);
+
 #endif
