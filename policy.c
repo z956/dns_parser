@@ -41,8 +41,10 @@ static struct policy policy_quest[] = {
 };
 
 /* response policy */
+static unsigned int policy_rep_nxdomain(void *data);
 static struct policy policy_rep[] = {
 	policy_field(POLICY_REP_SIZE, policy_pkt_size),
+	policy_field(POLICY_REP_NXDOMAIN, policy_rep_nxdomain),
 };
 
 /* answer poilcy */
@@ -196,6 +198,12 @@ unsigned int policy_quest_longest_repeat(void *data)
 	}
 	else
 		return 0;
+}
 
+/* response policy */
+unsigned int policy_rep_nxdomain(void *data)
+{
+	struct dns_pkt *dp = data;
+	return dp? DNS_FLAG_RCODE(dp->hdr->flag_code) == DNS_RCODE_NAME_ERR : 0;
 }
 

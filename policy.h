@@ -14,6 +14,7 @@ enum {
 };
 enum {
 	POLICY_REP_SIZE,
+	POLICY_REP_NXDOMAIN,
 	POLICY_REP_MAX,
 };
 
