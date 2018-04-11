@@ -11,24 +11,19 @@
 
 /* generic handler */
 static int policy_pkt_size(struct dns_pkt *dp, struct stats *st);
-static void policy_type_a(struct dns_sec_base *base, struct stats *st);
-static void policy_type_aaaa(struct dns_sec_base *base, struct stats *st);
-static void policy_type_null(struct dns_sec_base *base, struct stats *st);
-static void policy_type_txt(struct dns_sec_base *base, struct stats *st);
-static void policy_type_mx(struct dns_sec_base *base, struct stats *st);
-static void policy_type_cname(struct dns_sec_base *base, struct stats *st);
+
+static int policy_type_a(struct dns_pkt *dp, struct stats *st);
+static int policy_type_aaaa(struct dns_pkt *dp, struct stats *st);
+static int policy_type_null(struct dns_pkt *dp, struct stats *st);
+static int policy_type_txt(struct dns_pkt *dp, struct stats *st);
+static int policy_type_mx(struct dns_pkt *dp, struct stats *st);
+static int policy_type_cname(struct dns_pkt *dp, struct stats *st);
 
 /* request policy */
 static int policy_req_quest_name_size(struct dns_pkt *dp, struct stats *st);
 static int policy_req_quest_label_size(struct dns_pkt *dp, struct stats *st);
 static int policy_req_quest_unique_char(struct dns_pkt *dp, struct stats *st);
 static int policy_req_quest_longest_repeat(struct dns_pkt *dp, struct stats *st);
-static int policy_req_quest_type_a(struct dns_pkt *dp, struct stats *st);
-static int policy_req_quest_type_aaaa(struct dns_pkt *dp, struct stats *st);
-static int policy_req_quest_type_null(struct dns_pkt *dp, struct stats *st);
-static int policy_req_quest_type_txt(struct dns_pkt *dp, struct stats *st);
-static int policy_req_quest_type_mx(struct dns_pkt *dp, struct stats *st);
-static int policy_req_quest_type_cname(struct dns_pkt *dp, struct stats *st);
 static struct policy policy_req[] = {
 	policy_field(POLICY_REQ_SIZE, policy_pkt_size),
 
@@ -36,32 +31,26 @@ static struct policy policy_req[] = {
 	policy_field(POLICY_REQ_QUEST_LABEL_SIZE, policy_req_quest_label_size),
 	policy_field(POLICY_REQ_QUEST_UNIQUE_CHAR, policy_req_quest_unique_char),
 	policy_field(POLICY_REQ_QUEST_LONGEST_REPEAT, policy_req_quest_longest_repeat),
-	policy_field(POLICY_REQ_QUEST_TYPE_A, policy_req_quest_type_a),
-	policy_field(POLICY_REQ_QUEST_TYPE_AAAA, policy_req_quest_type_aaaa),
-	policy_field(POLICY_REQ_QUEST_TYPE_NULL, policy_req_quest_type_null),
-	policy_field(POLICY_REQ_QUEST_TYPE_TXT, policy_req_quest_type_txt),
-	policy_field(POLICY_REQ_QUEST_TYPE_MX, policy_req_quest_type_mx),
-	policy_field(POLICY_REQ_QUEST_TYPE_CNAME, policy_req_quest_type_cname),
+	policy_field(POLICY_REQ_QUEST_TYPE_A, policy_type_a),
+	policy_field(POLICY_REQ_QUEST_TYPE_AAAA, policy_type_aaaa),
+	policy_field(POLICY_REQ_QUEST_TYPE_NULL, policy_type_null),
+	policy_field(POLICY_REQ_QUEST_TYPE_TXT, policy_type_txt),
+	policy_field(POLICY_REQ_QUEST_TYPE_MX, policy_type_mx),
+	policy_field(POLICY_REQ_QUEST_TYPE_CNAME, policy_type_cname),
 };
 
 /* response policy */
 static int policy_rep_nxdomain(struct dns_pkt *dp, struct stats *st);
-static int policy_rep_ans_type_a(struct dns_pkt *dp, struct stats *st);
-static int policy_rep_ans_type_aaaa(struct dns_pkt *dp, struct stats *st);
-static int policy_rep_ans_type_null(struct dns_pkt *dp, struct stats *st);
-static int policy_rep_ans_type_txt(struct dns_pkt *dp, struct stats *st);
-static int policy_rep_ans_type_mx(struct dns_pkt *dp, struct stats *st);
-static int policy_rep_ans_type_cname(struct dns_pkt *dp, struct stats *st);
 static struct policy policy_rep[] = {
 	policy_field(POLICY_REP_SIZE, policy_pkt_size),
 	policy_field(POLICY_REP_NXDOMAIN, policy_rep_nxdomain),
 
-	policy_field(POLICY_REP_ANS_TYPE_A, policy_rep_ans_type_a),
-	policy_field(POLICY_REP_ANS_TYPE_AAAA, policy_rep_ans_type_aaaa),
-	policy_field(POLICY_REP_ANS_TYPE_NULL, policy_rep_ans_type_null),
-	policy_field(POLICY_REP_ANS_TYPE_TXT, policy_rep_ans_type_txt),
-	policy_field(POLICY_REP_ANS_TYPE_MX, policy_rep_ans_type_mx),
-	policy_field(POLICY_REP_ANS_TYPE_CNAME, policy_rep_ans_type_cname),
+	policy_field(POLICY_REP_ANS_TYPE_A, policy_type_a),
+	policy_field(POLICY_REP_ANS_TYPE_AAAA, policy_type_aaaa),
+	policy_field(POLICY_REP_ANS_TYPE_NULL, policy_type_null),
+	policy_field(POLICY_REP_ANS_TYPE_TXT, policy_type_txt),
+	policy_field(POLICY_REP_ANS_TYPE_MX, policy_type_mx),
+	policy_field(POLICY_REP_ANS_TYPE_CNAME, policy_type_cname),
 };
 
 struct policies policies[] = {
@@ -90,35 +79,57 @@ int policy_pkt_size(struct dns_pkt *dp, struct stats *st)
 	update_stats(st, dp->len);
 	return 0;
 }
-void policy_type_a(struct dns_sec_base *base, struct stats *st)
+
+static int policy_type_check(struct dns_pkt *dp, struct stats *st, int type)
 {
-	if (base && st)
-		update_stats(st, base->qtype == DNS_TYPE_A);
+	int qr = dns_qr(dp->hdr);
+	int offset;
+	void *p;
+	int count;
+
+	if (qr == DNS_QR_QUERY) {
+		offset = sizeof(struct dns_quest);
+		p = dp->quests;
+		count = dp->hdr->qd_count;
+	}
+	else if (qr == DNS_QR_REPLY) {
+		offset = sizeof(struct dns_answer);
+		p = dp->answers;
+		count = dp->hdr->an_count;
+	}
+	else
+		return -1;
+
+	for (int i = 0; i < count; i++) {
+		struct dns_sec_base *base = p + i * offset;
+		if (is_checking_type(base->qtype))
+			update_stats(st, base->qtype == type);
+	}
+	return 0;
 }
-void policy_type_aaaa(struct dns_sec_base *base, struct stats *st)
+int policy_type_a(struct dns_pkt *dp, struct stats *st)
 {
-	if (base && st)
-		update_stats(st, base->qtype == DNS_TYPE_AAAA);
+	return policy_type_check(dp, st, DNS_TYPE_A);
 }
-void policy_type_null(struct dns_sec_base *base, struct stats *st)
+int policy_type_aaaa(struct dns_pkt *dp, struct stats *st)
 {
-	if (base && st)
-		update_stats(st, base->qtype == DNS_TYPE_NULL);
+	return policy_type_check(dp, st, DNS_TYPE_AAAA);
 }
-void policy_type_txt(struct dns_sec_base *base, struct stats *st)
+int policy_type_null(struct dns_pkt *dp, struct stats *st)
 {
-	if (base && st)
-		update_stats(st, base->qtype == DNS_TYPE_TXT);
+	return policy_type_check(dp, st, DNS_TYPE_NULL);
 }
-void policy_type_mx(struct dns_sec_base *base, struct stats *st)
+int policy_type_txt(struct dns_pkt *dp, struct stats *st)
 {
-	if (base && st)
-		update_stats(st, base->qtype == DNS_TYPE_MX);
+	return policy_type_check(dp, st, DNS_TYPE_TXT);
 }
-void policy_type_cname(struct dns_sec_base *base, struct stats *st)
+int policy_type_mx(struct dns_pkt *dp, struct stats *st)
 {
-	if (base && st)
-		update_stats(st, base->qtype == DNS_TYPE_CNAME);
+	return policy_type_check(dp, st, DNS_TYPE_MX);
+}
+int policy_type_cname(struct dns_pkt *dp, struct stats *st)
+{
+	return policy_type_check(dp, st, DNS_TYPE_CNAME);
 }
 
 /* quest policy */
@@ -231,60 +242,6 @@ int policy_req_quest_longest_repeat(struct dns_pkt *dp, struct stats *st)
 	return apply_quest_policy(dp, st, quest_policy_longest_repeat);
 }
 
-static inline void quest_policy_type_a(struct dns_quest *q, struct stats *st)
-{
-	return policy_type_a((struct dns_sec_base *)q, st);
-}
-int policy_req_quest_type_a(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_quest_policy(dp, st, quest_policy_type_a);
-}
-
-static inline void quest_policy_type_aaaa(struct dns_quest *q, struct stats *st)
-{
-	return policy_type_aaaa((struct dns_sec_base *)q, st);
-}
-int policy_req_quest_type_aaaa(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_quest_policy(dp, st, quest_policy_type_aaaa);
-}
-
-static inline void quest_policy_type_null(struct dns_quest *q, struct stats *st)
-{
-	return policy_type_null((struct dns_sec_base *)q, st);
-}
-int policy_req_quest_type_null(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_quest_policy(dp, st, quest_policy_type_null);
-}
-
-static inline void quest_policy_type_txt(struct dns_quest *q, struct stats *st)
-{
-	return policy_type_txt((struct dns_sec_base *)q, st);
-}
-int policy_req_quest_type_txt(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_quest_policy(dp, st, quest_policy_type_txt);
-}
-
-static inline void quest_policy_type_mx(struct dns_quest *q, struct stats *st)
-{
-	return policy_type_mx((struct dns_sec_base *)q, st);
-}
-int policy_req_quest_type_mx(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_quest_policy(dp, st, quest_policy_type_mx);
-}
-
-static inline void quest_policy_type_cname(struct dns_quest *q, struct stats *st)
-{
-	return policy_type_cname((struct dns_sec_base *)q, st);
-}
-int policy_req_quest_type_cname(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_quest_policy(dp, st, quest_policy_type_cname);
-}
-
 /* response policy */
 typedef void (*ans_policy)(struct dns_answer *, struct stats *);
 static int apply_answer_policy(struct dns_pkt *dp, struct stats *st, ans_policy ap)
@@ -307,58 +264,5 @@ int policy_rep_nxdomain(struct dns_pkt *dp, struct stats *st)
 
 	update_stats(st, DNS_FLAG_RCODE(dp->hdr->flag_code) == DNS_RCODE_NAME_ERR);
 	return 0;
-}
-static inline void answer_policy_type_a(struct dns_answer *a, struct stats *st)
-{
-	return policy_type_a((struct dns_sec_base *)a, st);
-}
-int policy_rep_ans_type_a(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_answer_policy(dp, st, answer_policy_type_a);
-}
-
-static inline void answer_policy_type_aaaa(struct dns_answer *a, struct stats *st)
-{
-	return policy_type_aaaa((struct dns_sec_base *)a, st);
-}
-int policy_rep_ans_type_aaaa(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_answer_policy(dp, st, answer_policy_type_aaaa);
-}
-
-static inline void answer_policy_type_null(struct dns_answer *a, struct stats *st)
-{
-	return policy_type_null((struct dns_sec_base *)a, st);
-}
-int policy_rep_ans_type_null(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_answer_policy(dp, st, answer_policy_type_null);
-}
-
-static inline void answer_policy_type_txt(struct dns_answer *a, struct stats *st)
-{
-	return policy_type_txt((struct dns_sec_base *)a, st);
-}
-int policy_rep_ans_type_txt(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_answer_policy(dp, st, answer_policy_type_txt);
-}
-
-static inline void answer_policy_type_mx(struct dns_answer *a, struct stats *st)
-{
-	return policy_type_mx((struct dns_sec_base *)a, st);
-}
-int policy_rep_ans_type_mx(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_answer_policy(dp, st, answer_policy_type_mx);
-}
-
-static inline void answer_policy_type_cname(struct dns_answer *a, struct stats *st)
-{
-	return policy_type_cname((struct dns_sec_base *)a, st);
-}
-int policy_rep_ans_type_cname(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_answer_policy(dp, st, answer_policy_type_cname);
 }
 
