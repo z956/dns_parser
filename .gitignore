@@ -1,0 +1,18 @@
+# scripts
+check_non_tunnel.sh
+check_tunnel.sh
+
+# binary
+dns
+
+# pcap files
+non_tunnel/
+tunnel/
+
+# log files
+non_tunnel.log
+tunnel.log
+
+# file lists
+non_tunnel_file_list
+tunnel_file_list
