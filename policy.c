@@ -144,7 +144,8 @@ unsigned int policy_quest_unique_char(void *data)
 		unsigned char charset[256];
 		unsigned int r = 0;
 		int len = quest->base.qname.len;
-		const unsigned char *name = quest->base.qname.name;
+		unsigned char name[MAX_DOMAIN_LEN];
+		convert_domain_name(&quest->base.qname, name);
 
 		memset(charset, 0, 256);
 		for (int i = 0; i < len; i++)
