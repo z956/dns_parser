@@ -106,7 +106,7 @@ int parse_pkt(const char *pcap)
 	}
 
 	name = strdup(pcap);
-	file_pkt_count = 1;
+	file_pkt_count = 0;
 	if (pcap_loop(descr, 0, cb_pkt, name) < 0) {
 		ERR("packet_loop failed on file %s: %s\n", name, err);
 		r = -1;
@@ -157,14 +157,13 @@ void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt)
 	int offset;
 	unsigned int dns_len;
 
-	DBG("pkt count: %d\n", file_pkt_count);
 	file_pkt_count++;
 	if (!(offset = is_dns(pkt)))
 		return;
 	dns_len = hdr->caplen - offset;
 	dp = dns_alloc(pkt + offset, dns_len);
 	if (!dp) {
-		ERR("parse_dns(%s) failed\n", data);
+		ERR("parse_dns(%d, %s) failed\n", file_pkt_count, data);
 		return;
 	}
 
