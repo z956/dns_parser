@@ -29,10 +29,13 @@ void post_proc_req(struct list_head *head)
 
 	list_for_each_entry_safe (dp, tmp, head, list) {
 		for (int i = 0; i < dp->hdr->qd_count; i++) {
+			if (!is_checking_type(dp->quests[i].base.qtype))
+				continue;
+
 			apply_policy(quest_policy, POLICY_QUEST_MAX,
 					&dp->quests[i], quest_stats);
+			qd_count += dp->hdr->qd_count;
 		}
-		qd_count += dp->hdr->qd_count;
 
 		apply_policy(req_policy, POLICY_REQ_MAX, dp, req_stats);
 		pkt_count++;
@@ -62,10 +65,12 @@ void post_proc_rep(struct list_head *head)
 
 	list_for_each_entry_safe (dp, tmp, head, list) {
 		for (int i = 0; i < dp->hdr->an_count; i++) {
+			if (!is_checking_type(dp->answers[i].base.qtype))
+				continue;
 			apply_policy(ans_policy, POLICY_ANS_MAX,
 					&dp->answers[i], ans_stats);
+			ans_count += dp->hdr->an_count;
 		}
-		ans_count += dp->hdr->an_count;
 
 		apply_policy(rep_policy, POLICY_REP_MAX, dp, rep_stats);
 		pkt_count++;

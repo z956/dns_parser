@@ -109,5 +109,19 @@ static inline int dns_opcode(const struct dns_header *hdr)
 {
 	return hdr? DNS_FLAG_OPCODE(hdr->flag_code) : -1;
 }
+static inline int is_checking_type(int type)
+{
+	switch (type) {
+	case DNS_TYPE_A:
+	case DNS_TYPE_AAAA:
+	case DNS_TYPE_NULL:
+	case DNS_TYPE_TXT:
+	case DNS_TYPE_MX:
+	case DNS_TYPE_CNAME:
+		return 1;
+	default:
+		return 0;
+	}
+}
 
 #endif
