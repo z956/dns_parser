@@ -9,6 +9,14 @@ struct policy {
 };
 
 enum {
+	POLICY_REQ,
+	POLICY_QUEST,
+	POLICY_REP,
+	POLICY_ANS,
+	POLICY_MAX,
+};
+
+enum {
 	POLICY_REQ_SIZE,
 	POLICY_REQ_MAX,
 };
@@ -40,6 +48,12 @@ enum {
 	POLICY_ANS_TYPE_CNAME,
 	POLICY_ANS_MAX,
 };
+
+struct policies {
+	struct policy *p;
+	int size;
+};
+struct policies *get_policies(void);
 
 struct policy *get_policy_req(void);
 struct policy *get_policy_quest(void);

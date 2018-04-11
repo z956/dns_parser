@@ -16,13 +16,13 @@
 #include "common.h"
 #include "post_proc.h"
 #include "list.h"
+#include "pfi.h"
 
 static LIST_HEAD(req_head);
 static LIST_HEAD(rep_head);
 
 static int is_single_file;
 static char *file_name;
-static int file_pkt_count;
 
 static int parse_opt(int argc, char **argv);
 static int parse_pkt(const char *pcap);
@@ -94,25 +94,29 @@ int parse_opt(int argc, char **argv)
 		return -1;
 	return 0;
 }
+
 int parse_pkt(const char *pcap)
 {
 	char err[PCAP_ERRBUF_SIZE];
-	char *name;
 	int r = 0;
+	struct pfi *pfi;
 	pcap_t *descr = pcap_open_offline(pcap, err);
 	if (!descr) {
 		ERR("open pcap file %s failed: %s\n", pcap, err);
 		return -1;
 	}
 
-	name = strdup(pcap);
-	file_pkt_count = 0;
-	if (pcap_loop(descr, 0, cb_pkt, name) < 0) {
-		ERR("packet_loop failed on file %s: %s\n", name, err);
+	if (!(pfi = pfi_alloc(pcap))) {
+		ERR("Alloc pfi for file %s failed\n", pcap);
+		return -1;
+	}
+
+	if (pcap_loop(descr, 0, cb_pkt, (u_char *)pfi) < 0) {
+		ERR("packet_loop failed on file %s: %s\n", pfi->file_name, err);
 		r = -1;
 	}
 
-	free(name);
+	pfi_del(pfi);
 	return r;
 }
 int is_dns(const u_char *pkt)
@@ -156,14 +160,17 @@ void cb_pkt(u_char *data, const struct pcap_pkthdr* hdr, const u_char* pkt)
 	struct dns_pkt *dp;
 	int offset;
 	unsigned int dns_len;
+	struct pfi *pfi = (struct pfi *)data;
 
-	file_pkt_count++;
+	pfi->pkt_count++;
+
 	if (!(offset = is_dns(pkt)))
 		return;
+
 	dns_len = hdr->caplen - offset;
 	dp = dns_alloc(pkt + offset, dns_len);
 	if (!dp) {
-		ERR("parse_dns(%d, %s) failed\n", file_pkt_count, data);
+		ERR("parse_dns(%d, %s) failed\n", pfi->pkt_count, pfi->file_name);
 		return;
 	}
 

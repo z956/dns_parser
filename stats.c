@@ -7,6 +7,10 @@
 void init_stats(const char *tag, struct stats *s)
 {
 	s->tag = tag;
+	reset_stats(s);
+}
+void reset_stats(struct stats *s)
+{
 	s->total = 0;
 	s->max = 0;
 	s->min = INT_MAX;

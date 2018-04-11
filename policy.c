@@ -57,6 +57,16 @@ static struct policy policy_ans[] = {
 	policy_field(POLICY_ANS_TYPE_CNAME, policy_type_cname),
 };
 
+struct policies policies[] = {
+	[POLICY_REQ] = { policy_req, POLICY_REQ_MAX },
+	[POLICY_QUEST] = { policy_quest, POLICY_QUEST_MAX },
+	[POLICY_REP] = { policy_rep, POLICY_REP_MAX },
+	[POLICY_ANS] = { policy_ans, POLICY_ANS_MAX },
+};
+struct policies *get_policies(void)
+{
+	return policies;
+}
 struct policy *get_policy_req(void)
 {
 	return policy_req;

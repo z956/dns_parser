@@ -10,6 +10,7 @@ struct stats {
 };
 
 void init_stats(const char *tag, struct stats *s);
+void reset_stats(struct stats *s);
 void update_stats(struct stats *s, unsigned int v);
 void print_stats(struct stats *s);
 
