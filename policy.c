@@ -41,10 +41,16 @@ static struct policy policy_req[] = {
 
 /* response policy */
 static int policy_rep_nxdomain(struct dns_pkt *dp, struct stats *st);
+static int policy_rep_ans_name_size(struct dns_pkt *dp, struct stats *st);
+static int policy_rep_ans_unique_char(struct dns_pkt *dp, struct stats *st);
+static int policy_rep_ans_longest_repeat(struct dns_pkt *dp, struct stats *st);
 static struct policy policy_rep[] = {
 	policy_field(POLICY_REP_SIZE, policy_pkt_size),
 	policy_field(POLICY_REP_NXDOMAIN, policy_rep_nxdomain),
 
+	policy_field(POLICY_REP_ANS_NAME_SIZE, policy_rep_ans_name_size),
+	policy_field(POLICY_REP_ANS_UNIQUE_CHAR, policy_rep_ans_unique_char),
+	policy_field(POLICY_REP_ANS_LONGEST_REPEAT, policy_rep_ans_longest_repeat),
 	policy_field(POLICY_REP_ANS_TYPE_A, policy_type_a),
 	policy_field(POLICY_REP_ANS_TYPE_AAAA, policy_type_aaaa),
 	policy_field(POLICY_REP_ANS_TYPE_NULL, policy_type_null),
@@ -132,36 +138,15 @@ int policy_type_cname(struct dns_pkt *dp, struct stats *st)
 	return policy_type_check(dp, st, DNS_TYPE_CNAME);
 }
 
-/* quest policy */
-typedef void (*quest_policy)(struct dns_quest *, struct stats *);
-static int apply_quest_policy(struct dns_pkt *dp, struct stats *st, quest_policy qp)
+static void policy_domain_name_size(struct domain_name *dn, struct stats *st)
 {
-	if (!dp || !st || !qp)
-		return -1;
-
-	for (int i = 0; i < dp->hdr->qd_count; i++) {
-		struct dns_quest *q = &dp->quests[i];
-		if (!is_checking_type(q->base.qtype))
-			continue;
-		qp(q, st);
-	}
-	return 0;
+	update_stats(st, dn->len);
 }
-
-static void quest_policy_name_size(struct dns_quest *q, struct stats *st)
-{
-	update_stats(st, q->base.qname.len);
-}
-int policy_req_quest_name_size(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_quest_policy(dp, st, quest_policy_name_size);
-}
-
-static void quest_policy_label_size(struct dns_quest *q, struct stats *st)
+static void policy_domain_label_size(struct domain_name *dn, struct stats *st)
 {
 	unsigned int r = 0;
 	//count the avg of the 1st and 2nd label
-	unsigned char *p = q->base.qname.name;
+	unsigned char *p = dn->name;
 
 	//1st
 	int label1_len = *p;
@@ -178,18 +163,13 @@ static void quest_policy_label_size(struct dns_quest *q, struct stats *st)
 	}
 	update_stats(st, r);
 }
-int policy_req_quest_label_size(struct dns_pkt *dp, struct stats *st)
-{
-	return apply_quest_policy(dp, st, quest_policy_name_size);
-}
-
-static void quest_policy_unique_char(struct dns_quest *q, struct stats *st)
+static void policy_domain_unique_char(struct domain_name *dn, struct stats *st)
 {
 	unsigned char charset[256];
 	unsigned int r = 0;
-	int len = q->base.qname.len;
+	int len = dn->len;
 	unsigned char name[MAX_DOMAIN_LEN];
-	convert_domain_name(&q->base.qname, name);
+	convert_domain_name(dn, name);
 
 	memset(charset, 0, 256);
 	for (int i = 0; i < len; i++)
@@ -199,16 +179,11 @@ static void quest_policy_unique_char(struct dns_quest *q, struct stats *st)
 		r += !!charset[i];
 	update_stats(st, r);
 }
-
-int policy_req_quest_unique_char(struct dns_pkt *dp, struct stats *st)
+static void policy_domain_longest_repeat(struct domain_name *dn, struct stats *st)
 {
-	return apply_quest_policy(dp, st, quest_policy_unique_char);
-}
-static void quest_policy_longest_repeat(struct dns_quest *q, struct stats *st)
-{
-	int len = q->base.qname.len;
+	int len = dn->len;
 	unsigned char name[MAX_DOMAIN_LEN];
-	convert_domain_name(&q->base.qname, name);
+	convert_domain_name(dn, name);
 
 	unsigned int max_len = 0;
 	unsigned int non_vowel_len = 0;
@@ -235,7 +210,57 @@ static void quest_policy_longest_repeat(struct dns_quest *q, struct stats *st)
 			break;
 		}
 	}
+
 	update_stats(st, max_len);
+}
+
+/* quest policy */
+typedef void (*quest_policy)(struct dns_quest *, struct stats *);
+static int apply_quest_policy(struct dns_pkt *dp, struct stats *st, quest_policy qp)
+{
+	if (!dp || !st || !qp)
+		return -1;
+
+	for (int i = 0; i < dp->hdr->qd_count; i++) {
+		struct dns_quest *q = &dp->quests[i];
+		if (!is_checking_type(q->base.qtype))
+			continue;
+		qp(q, st);
+	}
+	return 0;
+}
+
+static void quest_policy_name_size(struct dns_quest *q, struct stats *st)
+{
+	policy_domain_name_size(&q->base.qname, st);
+}
+int policy_req_quest_name_size(struct dns_pkt *dp, struct stats *st)
+{
+	return apply_quest_policy(dp, st, quest_policy_name_size);
+}
+
+static void quest_policy_label_size(struct dns_quest *q, struct stats *st)
+{
+	policy_domain_label_size(&q->base.qname, st);
+}
+int policy_req_quest_label_size(struct dns_pkt *dp, struct stats *st)
+{
+	return apply_quest_policy(dp, st, quest_policy_name_size);
+}
+
+static void quest_policy_unique_char(struct dns_quest *q, struct stats *st)
+{
+	policy_domain_unique_char(&q->base.qname, st);
+}
+
+int policy_req_quest_unique_char(struct dns_pkt *dp, struct stats *st)
+{
+	return apply_quest_policy(dp, st, quest_policy_unique_char);
+}
+
+static void quest_policy_longest_repeat(struct dns_quest *q, struct stats *st)
+{
+	policy_domain_longest_repeat(&q->base.qname, st);
 }
 int policy_req_quest_longest_repeat(struct dns_pkt *dp, struct stats *st)
 {
@@ -264,5 +289,53 @@ int policy_rep_nxdomain(struct dns_pkt *dp, struct stats *st)
 
 	update_stats(st, DNS_FLAG_RCODE(dp->hdr->flag_code) == DNS_RCODE_NAME_ERR);
 	return 0;
+}
+
+static void ans_policy_name_size(struct dns_answer *a, struct stats *st)
+{
+	switch (a->base.qtype) {
+	case DNS_TYPE_CNAME:
+	case DNS_TYPE_MX:
+		policy_domain_name_size(&a->content_name, st);
+		break;
+	default:
+		break;
+	}
+}
+int policy_rep_ans_name_size(struct dns_pkt *dp, struct stats *st)
+{
+	return apply_answer_policy(dp, st, ans_policy_name_size);
+}
+
+static void ans_policy_unique_char(struct dns_answer *a, struct stats *st)
+{
+	switch (a->base.qtype) {
+	case DNS_TYPE_CNAME:
+	case DNS_TYPE_MX:
+		policy_domain_unique_char(&a->content_name, st);
+		break;
+	default:
+		break;
+	}
+}
+int policy_rep_ans_unique_char(struct dns_pkt *dp, struct stats *st)
+{
+	return apply_answer_policy(dp, st, ans_policy_unique_char);
+}
+
+static void ans_policy_longest_repeat(struct dns_answer *a, struct stats *st)
+{
+	switch (a->base.qtype) {
+	case DNS_TYPE_CNAME:
+	case DNS_TYPE_MX:
+		policy_domain_longest_repeat(&a->content_name, st);
+		break;
+	default:
+		break;
+	}
+}
+int policy_rep_ans_longest_repeat(struct dns_pkt *dp, struct stats *st)
+{
+	return apply_answer_policy(dp, st, ans_policy_longest_repeat);
 }
 
